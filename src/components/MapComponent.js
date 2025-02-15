@@ -11,6 +11,7 @@ const defaultIcon = new L.Icon({
     popupAnchor: [0, -41],  // Position of the popup relative to the marker
 });
 
+
 const MapComponent = ({ notableHumans }) => {
     const mapbox_token = process.env.REACT_APP_MAPBOX_API_TOKEN;
     const mapbox_user = process.env.REACT_APP_MAPBOX_USER;
@@ -24,7 +25,7 @@ const MapComponent = ({ notableHumans }) => {
 
     return (
         <div style={{ position: "relative", "height": "100%" }}>
-            {/* Floating Filter Box */}
+            {/*Floating Filter Box*/}
             <div style={{
                 position: "absolute",
                 bottom: "10px",
@@ -53,28 +54,40 @@ const MapComponent = ({ notableHumans }) => {
                         marginTop: "16px",
                         position: "relative"
                     }}>
-                      {children}
+                      {children.map((child, index) => (
+                        <div key={index}>{child}</div> // ✅ Add a key to each child
+                      ))}
                     </div>
                   )}
-                  renderThumb={({ props }) => (
-                    <div {...props} style={{
-                        height: "18px",
-                        width: "18px",
-                        background: "#007bff",
-                        borderRadius: "50%",
-                        position: "absolute",
-                    }} />
-                  )}
+                  renderThumb={({ props, index }) => {
+                      const { key, ...restProps } = props;
+                      // Calculate left position based on range value
+                      const position = (yearRange[index] - 1800) / (2020 - 1800) * 100; // Calculate percentage
+                      return (
+                          <div {...restProps} style={{
+                              height: "18px",
+                              width: "18px",
+                              background: "#007bff",
+                              borderRadius: "50%",
+                              position: "absolute",
+                              left: `${position}%`,
+                              transform: "translateX(-50%) translateY(-6px)", // Centers the thumb over the position
+                          }} />
+                      );
+                  }}
                 />
             </div>
+
 
             {/* Map */}
             <MapContainer
                 center={[51.505, -0.09]}
                 zoom={5}
                 worldCopyJump={true}
-                // preferCanvas={true}
-                style={{ height: "100%", width: '100%' }}>
+                preferCanvas={true}
+                zoomControl={false}
+                style={{ height: "100%", width: '100%' }}
+            >
 
                 <TileLayer
                     url={`https://api.mapbox.com/styles/v1/${mapbox_user}/${mapbox_style_id}/tiles/{z}/{x}/{y}?access_token=${mapbox_token}&fresh=true`}
@@ -82,21 +95,23 @@ const MapComponent = ({ notableHumans }) => {
                 />
 
                 {/* Markers */}
-                {filteredHumans.map((human) => (
-                    human.birth_latitude && human.birth_longitude ? (
-                      <Marker
-                        key={human.wikidata_id}
-                        position={[human.birth_latitude, human.birth_longitude]}
-                        icon={defaultIcon}
-                      >
-                        <Popup>
-                          <strong>{human.name}</strong><br />
-                          Born in: {human.birth_place}<br />
-                          Birth Date: {human.birth_date}
-                        </Popup>
-                      </Marker>
-                    ) : null
-                ))}
+                {filteredHumans.map((human, index) => {
+                    // console.log(`Rendering marker ${index}:`, human.wikidata_id) // Log the marker key
+                    return (
+                        human.birth_latitude && human.birth_longitude ? (
+                            <Marker
+                                key={human.wikidata_id}
+                                position={[human.birth_latitude, human.birth_longitude]}
+                                icon={defaultIcon}
+                            >
+                                <Popup>
+                                    <strong>{human.name}</strong><br/>
+                                    Born in: {human.birth_place}<br/>
+                                    Birth Date: {human.birth_date}
+                                </Popup>
+                            </Marker>
+                        ) : null);
+                })}
             </MapContainer>
         </div>
     );

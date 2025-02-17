@@ -1,53 +1,93 @@
-import {useEffect, useRef} from "react";
-import L from 'leaflet';
-import "leaflet-sidebar-v2/css/leaflet-sidebar.min.css";
-import 'leaflet-sidebar-v2'; // Import the Sidebar JavaScript (This may be missing)
-import '@fortawesome/fontawesome-free/css/all.min.css';
+import React from 'react';
 
-const SidebarComponent = ({ map }) => {
-    const sidebarRef = useRef(null);
-    useEffect(() => {
-        if (!map) return; // Ensure the map is available before initializing the sidebar
+const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOrder, markers }) => {
 
-        const sidebarElement = document.getElementById("sidebar");
-        if (sidebarElement) {
-            sidebarRef.current = L.control.sidebar({
-                autopan: true,
-                closeButton: true,
-                container: "sidebar",
-                position: "left",
-            }).addTo(map);
-        } else {
-            console.error("Sidebar element not found");
-        }
+    const handleMarkerLimitChange = (e) => {
+        // Notify parent component of the new limit
+        onMarkerLimitChange(e.target.value);
+    };
 
-        return () => {
-            if (sidebarRef.current) {
-                map.removeControl(sidebarRef.current);
-            }
-        };
-    }, [map]); // Depend on map to ensure proper initialization
+    const handleSortFieldChange = (e) => {
+        onSortChange(e.target.value, sortOrder); // Inform MapComponent of the change
+    };
+
+    const handleSortOrderChange = (e) => {
+        onSortChange(sortField, e.target.value); // Inform MapComponent of the change
+    };
 
     return (
         <div id="sidebar" className="leaflet-sidebar collapsed">
             {/* Tab Controls */}
             <div className="leaflet-sidebar-tabs">
                 <ul role="tablist">
-                    <li><a href="#home" role="tab"><i className="fa fa-filter"></i></a></li>
-                    {/*<li><a href="#info" role="tab"><i className="fa fa-info"></i></a></li>*/}
+                    <li><a href="#filtersort" role="tab"><i className="fa fa-filter"></i></a></li>
+                    <li><a href="#list" role="tab"><i className="fa fa-list"></i></a></li>
                 </ul>
             </div>
 
             {/* Tab Content */}
             <div className="leaflet-sidebar-content">
-                <div id="home" className="leaflet-sidebar-pane">
-                    <h1 className="leaflet-sidebar-header">Home</h1>
-                    <p>Welcome to the sidebar!</p>
+                <div id="filtersort" className="leaflet-sidebar-pane">
+                    <h1 className="leaflet-sidebar-header">Sort & Filter Options</h1>
+                    <div className="sort-option">
+                        <label htmlFor="sortField">Sort By</label>
+                        <select
+                            id="sortField"
+                            value={sortField}
+                            onChange={handleSortFieldChange}
+                        >
+                            <option value="birth_year">Birth Year</option>
+                            <option value="death_year">Death Year</option>
+                            <option value="article_length">Article Length</option>
+                            <option value="article_recent_views">Recent Views</option>
+                            <option value="article_total_edits">Total Edits</option>
+                            <option value="article_recent_edits">Recent Edits</option>
+                            <option value="article_created_date">Article Created Date</option>
+                        </select>
+                        <div className="sort-option">
+                            <label htmlFor="sortOrder">Order</label>
+                            <select
+                                id="sortOrder"
+                                value={sortOrder}
+                                onChange={handleSortOrderChange}
+                            >
+                                <option value="asc">Ascending</option>
+                                <option value="desc">Descending</option>
+                            </select>
+                        </div>
+                        {/* Limit Control */}
+                        <div className="limit-control">
+                            <label>
+                                Show:
+                                <select onChange={handleMarkerLimitChange}>
+                                    <option value="100">100</option>
+                                    <option value="500">500</option>
+                                    <option value="1000">1000</option>
+                                    {/*<option value="100">100</option>*/}
+                                </select>
+                                markers
+                            </label>
+                        </div>
+                    </div>
                 </div>
-                {/*<div id="info" className="leaflet-sidebar-pane">*/}
-                {/*    <h1 className="leaflet-sidebar-header">Info</h1>*/}
-                {/*    <p>More details go here.</p>*/}
-                {/*</div>*/}
+                <div id="list" className="leaflet-sidebar-pane">
+                    <h1 className="leaflet-sidebar-header">List</h1>
+                    <div className="markers-list">
+                        <h3>List of Notable Humans</h3>
+                        <ol>
+                            {markers.length > 0 ? (
+                                markers.map((marker, index) => (
+                                    <li key={index}>
+                                        <p>{marker.name}</p>
+                                        {/* Add any other properties you want to display */}
+                                    </li>
+                                ))
+                            ) : (
+                                <p>No markers available</p>
+                            )}
+                        </ol>
+                    </div>
+                </div>
             </div>
         </div>
     );

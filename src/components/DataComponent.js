@@ -1,14 +1,10 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect } from "react";
 import axios from "axios";
 import { AuthContext } from "./AuthContext";
-import MapComponent from "./MapComponent";
 
-const DataComponent = () => {
-    const { token } = useContext(AuthContext);
-    const [data, setData] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
+const DataComponent = ({ handleDataFetched, sortField, sortOrder, markerLimit } ) => {
     const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
+    const { token } = useContext(AuthContext);
 
 
     useEffect(() => {
@@ -18,23 +14,22 @@ const DataComponent = () => {
             try {
                 const response = await axios.get(`${API_BASE_URL}/notablehumans/`, {
                     headers: { Authorization: `Token ${token}` },
+                    params: {
+                        sort_by: sortField,
+                        order: sortOrder,
+                        limit: markerLimit,
+                    },
                 });
-
-                setData(response.data);
+                handleDataFetched(response.data);
             } catch (err) {
-                setError(err.message);
-            } finally {
-                setLoading(false);
+                console.error("Error fetching data:", err);
             }
         };
 
         fetchData();
-    }, [token, API_BASE_URL]); // Runs when token is available
+    }, [token, API_BASE_URL, sortField, sortOrder, markerLimit]); // Runs when token is available
 
-    if (loading) return <p>Loading data...</p>;
-    if (error) return <p>Error: {error}</p>;
-
-    return <MapComponent markers={data} />;
+    return null;
 };
 
 export default DataComponent;

@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import './App.css';
 import Header from './components/Header';
-import MapComponent from './components/MapComponent';
 import AuthProvider from "./components/AuthContext";
+import DataComponent from './components/DataComponent';
 
 
 function App() {
@@ -13,8 +13,7 @@ function App() {
                 <header className="App-header">
                     <Header />
                 </header>
-                {/* MapComponent manages map, markers, sidebar, and data */}
-                <MapComponent />
+                <DataComponent />
             </div>
         </AuthProvider>
     );

@@ -1,19 +1,11 @@
-import React from 'react';
+import '@fortawesome/fontawesome-free/css/all.min.css';
 
-const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOrder, markers }) => {
+// Handles UI controls for sorting and limiting markers.
+// Updates DataComponent.js with user-selected values.
 
-    const handleMarkerLimitChange = (e) => {
-        // Notify parent component of the new limit
-        onMarkerLimitChange(e.target.value);
-    };
+function SidebarComponent({ sortField, setSortField, sortOrder, setSortOrder, markerLimit, setMarkerLimit, markers }) {
 
-    const handleSortFieldChange = (e) => {
-        onSortChange(e.target.value, sortOrder); // Inform MapComponent of the change
-    };
-
-    const handleSortOrderChange = (e) => {
-        onSortChange(sortField, e.target.value); // Inform MapComponent of the change
-    };
+    const visibleMarkers = markers.slice(0, markerLimit);  // Limit the markers to the markerLimit
 
     return (
         <div id="sidebar" className="leaflet-sidebar collapsed">
@@ -34,7 +26,7 @@ const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOr
                         <select
                             id="sortField"
                             value={sortField}
-                            onChange={handleSortFieldChange}
+                            onChange={(e) => setSortField(e.target.value)}
                         >
                             <option value="birth_year">Birth Year</option>
                             <option value="death_year">Death Year</option>
@@ -49,7 +41,7 @@ const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOr
                             <select
                                 id="sortOrder"
                                 value={sortOrder}
-                                onChange={handleSortOrderChange}
+                                onChange={(e) => setSortOrder(e.target.value)}
                             >
                                 <option value="asc">Ascending</option>
                                 <option value="desc">Descending</option>
@@ -59,11 +51,12 @@ const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOr
                         <div className="limit-control">
                             <label>
                                 Show:
-                                <select onChange={handleMarkerLimitChange}>
+                                <select value={markerLimit} onChange={(e) => setMarkerLimit(parseInt(e.target.value, 10))}>
+                                    <option value="10">10</option>
+                                    <option value="50">50</option>
                                     <option value="100">100</option>
+                                    <option value="250">250</option>
                                     <option value="500">500</option>
-                                    <option value="1000">1000</option>
-                                    {/*<option value="100">100</option>*/}
                                 </select>
                                 markers
                             </label>
@@ -75,9 +68,9 @@ const SidebarComponent = ({ onSortChange, onMarkerLimitChange, sortField, sortOr
                     <div className="markers-list">
                         <h3>List of Notable Humans</h3>
                         <ol>
-                            {markers.length > 0 ? (
-                                markers.map((marker, index) => (
-                                    <li key={index}>
+                            {visibleMarkers.length > 0 ? (
+                                visibleMarkers.map((marker) => (
+                                    <li key={marker.wikidata_id}>
                                         <p>{marker.name}</p>
                                         {/* Add any other properties you want to display */}
                                     </li>

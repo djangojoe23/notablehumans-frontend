@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import Globe from 'react-globe.gl';
-import * as THREE from 'three';
 
 
-const GlobeComponent = ( {sidebarOpen} ) => {
+const GlobeComponent = () => {
     const globeRef = useRef();
     const containerRef = useRef(null);
     const [dimensions, setDimensions] = useState({ width: 0, height: 0 });

@@ -1,6 +1,6 @@
 import React, { useContext, useState, useRef, useEffect } from "react";
 import axios from "axios";
-import { AuthContext } from "../components/AuthContext";
+import { AuthProvider } from "../components/AuthProvider";
 import SidebarComponent from "./SidebarComponent";
 import MapComponent from "./MapComponent"
 import "leaflet/dist/leaflet.css";
@@ -17,7 +17,7 @@ import 'leaflet.markercluster/dist/MarkerCluster.Default.css';
 
 const DataComponent = () => {
     const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
-    const { token } = useContext(AuthContext);
+    const { token } = useContext(AuthProvider);
 
     const mapRef = useRef(null);
 

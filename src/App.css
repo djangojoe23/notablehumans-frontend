@@ -1,46 +1,7 @@
-.App-container {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-}
-
-.App-header {
-  height: 60px; /* Adjust as needed */
-  padding-left: 10px;
-  display: flex;
-  align-items: center;
-}
-
-.map-wrapper {
-  flex-grow: 1; /* Ensure this takes up remaining space */
-  display: flex; /* Helps nested children expand */
-}
-
-.map-container {
-  flex-grow: 1;
-  height: 100%;
-}
-
-.sort-option {
-    margin-bottom: 20px;
-}
-
-label {
-    font-size: 14px;
-    font-weight: bold;
-    margin-bottom: 5px;
-    display: block;
-}
-
-select {
-    width: 100%;
-    padding: 8px;
-    font-size: 14px;
-    border: 1px solid #ccc;
-    border-radius: 4px;
-}
-
-select:focus {
-    outline: none;
-    border-color: #007bff;
+/* Ensure the entire page fits without scrolling */
+html, body, #root {
+  height: 100vh; /* Full viewport height */
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents both horizontal and vertical scrolling */
 }

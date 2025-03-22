@@ -1,89 +1,90 @@
-import '@fortawesome/fontawesome-free/css/all.min.css';
+import React from 'react';
+import { motion } from 'framer-motion';
+import { FaFilter, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 
-// Handles UI controls for sorting and limiting markers.
-// Updates DataComponent.js with user-selected values.
+const SidebarComponent = ({ sidebarOpen, setSidebarOpen }) => {
+    const sidebarWidth = 400; // Full width when open
+    const buttonSize = 50;    // Toggle button size
+    const arrowSize = 14;     // Arrow icon size
 
-function SidebarComponent({ sortField, setSortField, sortOrder, setSortOrder, markerLimit, setMarkerLimit, markers }) {
-
-    const visibleMarkers = markers.slice(0, markerLimit);  // Limit the markers to the markerLimit
+    // Define the arrow's left offset for each state
+    const arrowLeftOpen = 5;
+    const arrowLeftClosed = buttonSize - arrowSize - 5; // e.g. 40 - 12 - 5 = 23
 
     return (
-        <div id="sidebar" className="leaflet-sidebar collapsed">
-            {/* Tab Controls */}
-            <div className="leaflet-sidebar-tabs">
-                <ul role="tablist">
-                    <li><a href="#filtersort" role="tab"><i className="fa fa-filter"></i></a></li>
-                    <li><a href="#list" role="tab"><i className="fa fa-list"></i></a></li>
-                </ul>
-            </div>
+        <div style={{ position: 'relative', height: '100%', display: 'flex' }}>
+            {/* Sidebar container that animates its width */}
+            <motion.div
+                initial={false}
+                animate={{ width: sidebarOpen ? sidebarWidth : 0 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{
+                    background: '#f4f4f4',
+                    overflow: 'hidden',
+                    height: '100%',
+                    boxSizing: 'border-box',
+                    flexShrink: 0,
+                }}
+            >
+                {sidebarOpen && (
+                    <div style={{ marginTop: buttonSize + 10, padding: 10 }}>
+                        <h3>Locations</h3>
+                        <p>hello</p>
+                        {/* Additional sidebar content */}
+                    </div>
+                )}
+            </motion.div>
 
-            {/* Tab Content */}
-            <div className="leaflet-sidebar-content">
-                <div id="filtersort" className="leaflet-sidebar-pane">
-                    <h1 className="leaflet-sidebar-header">Sort & Filter Options</h1>
-                    <div className="sort-option">
-                        <label htmlFor="sortField">Sort By</label>
-                        <select
-                            id="sortField"
-                            value={sortField}
-                            onChange={(e) => setSortField(e.target.value)}
-                        >
-                            <option value="birth_year">Birth Year</option>
-                            <option value="death_year">Death Year</option>
-                            <option value="article_length">Article Length</option>
-                            <option value="article_recent_views">Recent Views</option>
-                            <option value="article_total_edits">Total Edits</option>
-                            <option value="article_recent_edits">Recent Edits</option>
-                            <option value="article_created_date">Article Created Date</option>
-                        </select>
-                        <div className="sort-option">
-                            <label htmlFor="sortOrder">Order</label>
-                            <select
-                                id="sortOrder"
-                                value={sortOrder}
-                                onChange={(e) => setSortOrder(e.target.value)}
-                            >
-                                <option value="asc">Ascending</option>
-                                <option value="desc">Descending</option>
-                            </select>
-                        </div>
-                        {/* Limit Control */}
-                        <div className="limit-control">
-                            <label>
-                                Show:
-                                <select value={markerLimit} onChange={(e) => setMarkerLimit(parseInt(e.target.value, 10))}>
-                                    <option value="10">10</option>
-                                    <option value="50">50</option>
-                                    <option value="100">100</option>
-                                    <option value="250">250</option>
-                                    <option value="500">500</option>
-                                </select>
-                                markers
-                            </label>
-                        </div>
-                    </div>
-                </div>
-                <div id="list" className="leaflet-sidebar-pane">
-                    <h1 className="leaflet-sidebar-header">List</h1>
-                    <div className="markers-list">
-                        <h3>List of Notable Humans</h3>
-                        <ol>
-                            {visibleMarkers.length > 0 ? (
-                                visibleMarkers.map((marker) => (
-                                    <li key={marker.wikidata_id}>
-                                        <p>{marker.name}</p>
-                                        {/* Add any other properties you want to display */}
-                                    </li>
-                                ))
-                            ) : (
-                                <p>No markers available</p>
-                            )}
-                        </ol>
-                    </div>
-                </div>
+            {/* Toggle button as a motion component */}
+            <motion.button
+                onClick={() => setSidebarOpen(!sidebarOpen)}
+                animate={{ left: sidebarOpen ? sidebarWidth - buttonSize - 10 : 10 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{
+                    position: 'absolute',
+                    top: 10,
+                    zIndex: 20,
+                    width: buttonSize,
+                    height: buttonSize,
+                    borderRadius: '50%',
+                    border: 'none',
+                    background: '#007bff',
+                    color: '#fff',
+                    cursor: 'pointer',
+                    padding: 0,
+                }}
+            >
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+                {/* Main filter icon, centered */}
+                <FaFilter
+                    size={28}
+                    style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                    }}
+                />
+                {/* Arrow icon container, which animates its left offset */}
+                <motion.div
+                    animate={{ left: sidebarOpen ? arrowLeftOpen : arrowLeftClosed }}
+                    transition={{ duration: 0.3, ease: 'easeInOut' }}
+                    style={{
+                        position: 'absolute',
+                        top: '57%',
+                        transform: 'translateY(-50%)',
+                    }}
+                >
+                    {sidebarOpen ? (
+                      <FaArrowLeft size={arrowSize} />
+                    ) : (
+                      <FaArrowRight size={arrowSize} />
+                    )}
+                </motion.div>
             </div>
+            </motion.button>
         </div>
-    );
-};
+        );
+    };
 
 export default SidebarComponent;

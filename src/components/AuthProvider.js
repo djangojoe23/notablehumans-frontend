@@ -9,7 +9,7 @@ const AuthProvider = ({ children }) => {
   const API_PASSWORD = process.env.REACT_APP_API_PASSWORD;
 
   const [token, setToken] = useState(null);
-  const [loading, setLoading] = useState(true);  // New state for loading
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {

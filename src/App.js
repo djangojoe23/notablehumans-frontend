@@ -8,7 +8,9 @@ import getData from './components/getNotableHumanData';
 
 
 // TODO
-// HANDLE CLUSTERS WHEN CLICKED SHOW INFO ABOUT POINT/FULLYOVERLAPPING POINT AND INDICATE THAT IT IS CURRENTLY HIGHLIGHTED
+// PULSE EFFECT LOOKS DIFFERENT BASED ON SIZE OF POINT....
+// ADD HOVER EFFECT TO FULLY-OVERLAPPING/DECLUSTERED POINTS LIKE HERE https://docs.mapbox.com/mapbox-gl-js/example/simple-interactions/
+// WHEN CLICKED SHOW INFO ABOUT POINT/FULLYOVERLAPPING POINT IN SIDEBAR
 // GET SIDEBAR TO LIST THE PEOPLE AND SORT THEM AND SEARCH THEM WITH LAZY LOADING
 // ZOOM TO POINT WHEN CLICKED IN THE SIDEBAR
 // FILTERS
@@ -36,7 +38,11 @@ function App() {
                 }}>
 
                     <GlobeComponent>
-                        <MarkerComponent data={allHumans} />
+                        <MarkerComponent
+                            data={allHumans}
+                            sidebarOpen={sidebarOpen}
+                            openSidebar={() => setSidebarOpen(true)}
+                        />
                     </GlobeComponent>
                 </div>
             </div>

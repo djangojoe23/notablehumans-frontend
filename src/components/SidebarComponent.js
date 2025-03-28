@@ -9,7 +9,7 @@ const SidebarComponent = ({ sidebarOpen, setSidebarOpen }) => {
 
     // Define the arrow's left offset for each state
     const arrowLeftOpen = 5;
-    const arrowLeftClosed = buttonSize - arrowSize - 5; // e.g. 40 - 12 - 5 = 23
+    const arrowLeftClosed = buttonSize - arrowSize - 8; // e.g. 40 - 12 - 5 = 23
 
     return (
         <div style={{ position: 'relative', height: '100%', display: 'flex' }}>
@@ -47,8 +47,8 @@ const SidebarComponent = ({ sidebarOpen, setSidebarOpen }) => {
                     width: buttonSize,
                     height: buttonSize,
                     borderRadius: '50%',
-                    border: 'none',
-                    background: '#007bff',
+                    border: '2px solid #fff',
+                    background: '#11b4da',
                     color: '#fff',
                     cursor: 'pointer',
                     padding: 0,

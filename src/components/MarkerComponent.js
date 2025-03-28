@@ -1,10 +1,17 @@
 // MarkerComponent.js
-import React, { useContext, useEffect } from 'react';
+import React, { useContext, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapContext } from './MapContext';
 
-const MarkerComponent = ({ data }) => {
-  const map = useContext(MapContext);
+const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
+  const { map, isAnimatingRef } = useContext(MapContext);
+  // Create a ref to store current sidebar state
+  const sidebarOpenRef = useRef(sidebarOpen);
+
+  // Sync the ref with sidebarOpen
+  useEffect(() => {
+    sidebarOpenRef.current = sidebarOpen;
+  }, [sidebarOpen]);
 
   // Helper function to convert your JSON data to GeoJSON
   const convertToGeoJSON = (data) => ({
@@ -51,8 +58,8 @@ const MarkerComponent = ({ data }) => {
           'circle-color': [
             'case',
             ['boolean', ['feature-state', 'fullyOverlapping'], false],
-            '#11b4da', // color for clusters that are fully overlapping (same as singleton)
-            '#f28cb1'  // default cluster color for declusterable clusters
+            '#f28cb1', // color for clusters that are fully overlapping (same as singleton)
+            '#11b4da'  // default cluster color for declusterable clusters
           ],
           'circle-radius': [
             'step',
@@ -86,16 +93,33 @@ const MarkerComponent = ({ data }) => {
         source: sourceId,
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-color': '#11b4da',
-          'circle-radius': 8,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#fff',
+          'circle-color': '#f28cb1',
+          'circle-radius': 10,
         },
       });
 
-      if (map.getLayer('clusters')) {
-        // Listen for clicks on the clusters layer
-        map.on('click', 'clusters', (e) => {
+      // Add a symbol layer on top for the "1" label
+      map.addLayer({
+        id: 'unclustered-count',
+        type: 'symbol',
+        source: sourceId,
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'text-field': '1',
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 12,
+          'text-offset': [0, 0]
+        },
+      });
+
+      // Determine the offset: apply offset only if sidebar is closed.
+      const getOffset = () => {
+        const sidebarWidth = 400; // width in pixels, adjust as needed
+        return sidebarOpenRef.current ? [0, 0] : [sidebarWidth / -2, 0];
+      };
+
+      // Listen for clicks on the clusters layer
+      map.on('click', 'clusters', (e) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         if (!features.length) return;
 
@@ -103,10 +127,23 @@ const MarkerComponent = ({ data }) => {
         const state = map.getFeatureState({ source: 'humans', id: cluster.id });
 
         if (state && state.fullyOverlapping === true) {
-          // For fully overlapping clusters, simply center without changing zoom.
+          // For fully overlapping clusters...
+          map.getSource('selected-feature').setData({
+            type: 'FeatureCollection',
+            features: [{
+              type: 'Feature',
+              geometry: cluster.geometry
+            }]
+          });
+
+          isAnimatingRef.current = true; // Set flag before animating
+
+          // open sidebar and simply center without changing zoom.
+          openSidebar(cluster.properties); // Pass data if needed
           map.easeTo({
             center: cluster.geometry.coordinates,
-            duration: 500
+            duration: 500,
+            offset: getOffset(),
           });
         } else {
           // Otherwise, zoom to the cluster expansion level.
@@ -116,20 +153,11 @@ const MarkerComponent = ({ data }) => {
             map.easeTo({
               center: cluster.geometry.coordinates,
               zoom: expansionZoom,
-              duration: 500
+              duration: 1000
             });
           });
         }
       });
-
-        // Change the cursor style when hovering over clusters
-        map.on('mouseenter', 'clusters', () => {
-          map.getCanvas().style.cursor = 'pointer';
-        });
-        map.on('mouseleave', 'clusters', () => {
-          map.getCanvas().style.cursor = '';
-        });
-      }
 
       // Listen for clicks on unclustered points
       map.on('click', 'unclustered-point', (e) => {
@@ -138,18 +166,40 @@ const MarkerComponent = ({ data }) => {
         });
         if (!features.length) return;
         const feature = features[0];
-        const coordinates = feature.geometry.coordinates.slice(); // Copy to avoid mutation
 
+        // Update the selected-feature source with the clicked point
+        map.getSource('selected-feature').setData({
+          type: 'FeatureCollection',
+          features: [{
+            type: 'Feature',
+            geometry: feature.geometry
+          }]
+        });
+
+        const coordinates = feature.geometry.coordinates.slice(); // Copy to avoid mutation
         const currentZoom = map.getZoom();
+
+        isAnimatingRef.current = true; // Set flag before animating
+
+        // Open sidebar with point data
+        openSidebar(feature.properties);
 
         // Animate the map to center on the clicked point and zoom in
         map.easeTo({
           center: coordinates,
           zoom: currentZoom, // set to your desired zoom level
           duration: 500, // adjust duration as needed
+          offset: getOffset(),
         });
       });
 
+      // Change the cursor style when hovering over clusters
+      map.on('mouseenter', 'clusters', () => {
+        map.getCanvas().style.cursor = 'pointer';
+      });
+      map.on('mouseleave', 'clusters', () => {
+        map.getCanvas().style.cursor = '';
+      });
       // Change the cursor style when hovering over unclustered points
       map.on('mouseenter', 'unclustered-point', () => {
         map.getCanvas().style.cursor = 'pointer';
@@ -162,7 +212,7 @@ const MarkerComponent = ({ data }) => {
       // If the source already exists, update its data
       map.getSource(sourceId).setData(convertToGeoJSON(data));
     }
-  }, [map, data]);
+  }, [map, data, openSidebar]);
 
   useEffect(() => {
     if (!map) return;
@@ -227,7 +277,7 @@ const MarkerComponent = ({ data }) => {
       };
     };
 
-    // Create a debounced version of the update function with a 200ms delay.
+    // Create a debounced version of the update function with a 300ms delay.
     const debouncedUpdate = debounce(updateOverlapStates, 300);
 
     map.on('moveend', debouncedUpdate);

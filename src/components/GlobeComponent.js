@@ -3,20 +3,86 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { MapContext } from './MapContext';
 
-const GlobeComponent = ( {children} ) => {
+const GlobeComponent = ({ children }) => {
+  // Environment tokens and style settings
   const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_API_TOKEN;
   const MAPBOX_USERNAME = process.env.REACT_APP_MAPBOX_USER;
   const MAPBOX_STYLE_ID = process.env.REACT_APP_MAPBOX_STYLE_ID;
 
+  // References and state
   const containerRef = useRef(null);
   const [map, setMap] = useState(null);
-  const isAnimatingRef = useRef(false);
+  const isAnimatingRef = useRef(false);             // Tracks programmatic animations
+  const pulseAnimationFrameRef = useRef(null);        // Holds the current pulse animation frame
+  const haloPersistRef = useRef(false);               // Indicates if a halo is active/persistent
 
+  // Helper: Sets up the halo source and circle layer for the pulsing effect.
+  const setupHaloLayer = (mapInstance) => {
+    if (!mapInstance.getSource('halo-feature')) {
+      mapInstance.addSource('halo-feature', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      mapInstance.addLayer({
+        id: 'halo-layer',
+        type: 'circle',
+        source: 'halo-feature',
+        paint: {
+          // The circle radius is the sum of baseRadius and pulseOffset properties.
+          'circle-radius': ['+', ['get', 'baseRadius'], ['get', 'pulseOffset']],
+          'circle-color': 'rgba(255,100,100,0.3)',  // Semi-transparent red fill
+          'circle-stroke-color': 'white',
+          'circle-stroke-width': 2,
+          'circle-opacity': 0.7
+        }
+      });
+    }
+  };
+
+  // Helper: Clears the halo and cancels any running pulse animation.
+  const clearHaloAndAnimation = (mapInstance) => {
+    if (pulseAnimationFrameRef.current) {
+      cancelAnimationFrame(pulseAnimationFrameRef.current);
+      pulseAnimationFrameRef.current = null;
+    }
+    if (mapInstance.getSource('halo-feature')) {
+      mapInstance.getSource('halo-feature').setData({
+        type: 'FeatureCollection',
+        features: []
+      });
+    }
+    haloPersistRef.current = false;
+  };
+
+  // Helper: Sets up global event handlers to clear the halo on user interaction.
+  const setupGlobalHaloClearHandlers = (mapInstance) => {
+    // Clear halo when zooming starts
+    mapInstance.on('zoomstart', () => {
+      clearHaloAndAnimation(mapInstance);
+    });
+
+    // Clear halo on click or mousedown if a halo is active.
+    mapInstance.on('click', (e) => {
+      if (haloPersistRef.current) {
+        clearHaloAndAnimation(mapInstance);
+      }
+    });
+    mapInstance.on('mousedown', (e) => {
+      if (haloPersistRef.current) {
+        clearHaloAndAnimation(mapInstance);
+      }
+    });
+  };
 
   // Initialize map only once
   useEffect(() => {
     if (map) return;
 
+    // Clean out container if needed.
     if (containerRef.current) {
       containerRef.current.replaceChildren();
     }
@@ -31,124 +97,34 @@ const GlobeComponent = ( {children} ) => {
       maxZoom: 14,
     });
 
+    // When the map loads, set up the halo and global event handlers.
     mapInstance.on('load', () => {
-      // Step 1: Define and add the pulsing dot image
-      const size = 200;
-      const pulsingDot = {
-        width: size,
-        height: size,
-        data: new Uint8Array(size * size * 4),
-        onAdd: function () {
-          const canvas = document.createElement('canvas');
-          canvas.width = this.width;
-          canvas.height = this.height;
-          this.context = canvas.getContext('2d', { willReadFrequently: true });
-        },
-        render: function () {
-          const duration = 1000;
-          const t = (performance.now() % duration) / duration;
-          const radius = (size / 2) * 0.3;
-          const outerRadius = (size / 2) * 0.7 * t + radius;
-          const context = this.context;
-          context.clearRect(0, 0, this.width, this.height);
-          context.beginPath();
-          context.arc(this.width / 2, this.height / 2, outerRadius, 0, Math.PI * 2);
-          context.fillStyle = `rgba(255, 200, 200, ${1 - t})`;
-          context.fill();
-          context.beginPath();
-          context.arc(this.width / 2, this.height / 2, radius, 0, Math.PI * 2);
-          context.fillStyle = 'rgba(255, 100, 100, 1)';
-          context.strokeStyle = 'white';
-          context.lineWidth = 2 + 4 * (1 - t);
-          context.fill();
-          context.stroke();
-          this.data = context.getImageData(0, 0, this.width, this.height).data;
-          mapInstance.triggerRepaint();
-          return true;
-        }
-      };
-
-      // Add the pulsing dot image to the map style
-      if (!mapInstance.hasImage('pulsing-dot')) {
-        mapInstance.addImage('pulsing-dot', pulsingDot, { pixelRatio: 2 });
-      }
-
-      if (!mapInstance.getSource('selected-feature')) {
-        mapInstance.addSource('selected-feature', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: []
-          }
-        });
-
-        mapInstance.addLayer({
-          id: 'selected-feature-layer',
-          type: 'symbol',
-          source: 'selected-feature',
-          layout: {
-            'icon-image': 'pulsing-dot',
-            'icon-allow-overlap': true
-          }
-        });
-      }
-
-     // Step 4: Global handlers to clear halo when user interacts (but not during animation)
-      mapInstance.on('click', (e) => {
-        // If the click is not on the selected feature layer and not during a programmatic animation
-        if (!isAnimatingRef.current) {
-          const features = mapInstance.queryRenderedFeatures(e.point, {
-            layers: ['selected-feature-layer']
-          });
-          if (!features.length) {
-            mapInstance.getSource('selected-feature').setData({
-              type: 'FeatureCollection',
-              features: []
-            });
-          }
-        }
-      });
-
-      // Listen for moveend to reset our flag
-      mapInstance.on('moveend', () => {
-        isAnimatingRef.current = false;
-      });
-
-      // Global handler to clear halo on mousedown (user-initiated interaction)
-      mapInstance.on('mousedown', (e) => {
-        // If the movement is user-initiated, clear the halo.
-        if (!isAnimatingRef.current) {
-          mapInstance.getSource('selected-feature').setData({
-            type: 'FeatureCollection',
-            features: []
-          });
-        }
-      });
-
+      setupHaloLayer(mapInstance);
+      setupGlobalHaloClearHandlers(mapInstance);
       setMap(mapInstance);
     });
 
-
-    // Listen for window resize events
+    // Listen for window resize events.
     const handleResize = () => {
-      mapInstance && mapInstance.resize();
+      if (mapInstance) {
+        mapInstance.resize();
+      }
     };
-
     window.addEventListener('resize', handleResize);
-
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
   }, [map, MAPBOX_TOKEN, MAPBOX_USERNAME, MAPBOX_STYLE_ID]);
 
-  // Use ResizeObserver with a debounce to smoothly call map.resize()
+  // Use ResizeObserver to trigger smooth map resize on container changes.
   useEffect(() => {
     if (!containerRef.current || !map) return;
-
     let debounceTimeout;
     const resizeObserver = new ResizeObserver(() => {
       clearTimeout(debounceTimeout);
       debounceTimeout = setTimeout(() => {
         map.resize();
-      }, 1); // or adjust the delay as needed
+      }, 1);
     });
     resizeObserver.observe(containerRef.current);
     return () => {
@@ -158,16 +134,14 @@ const GlobeComponent = ( {children} ) => {
   }, [map]);
 
   return (
-       <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      {/* Map container: must be empty for Mapbox GL */}
+    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+      {/* Map container must be empty for Mapbox GL */}
       <div
         ref={containerRef}
         style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
       />
-
-      {/* Overlay for children */}
       {map && (
-        <MapContext.Provider value={{map, isAnimatingRef}}>
+        <MapContext.Provider value={{ map, isAnimatingRef, pulseAnimationFrameRef, haloPersistRef }}>
           <div style={{ position: 'relative', zIndex: 1 }}>
             {children}
           </div>
@@ -175,7 +149,6 @@ const GlobeComponent = ( {children} ) => {
       )}
     </div>
   );
-
 };
 
 export default GlobeComponent;

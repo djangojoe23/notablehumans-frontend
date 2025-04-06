@@ -1,12 +1,29 @@
+// getNotableHumanData.js
 import { useState, useEffect, useContext } from 'react';
 import axios from 'axios';
 import { AuthContext } from './AuthProvider';
 
-const useHumansData = () => {
+const convertToGeoJSON = (data) => ({
+  type: 'FeatureCollection',
+  features: data.map((person) => {
+    const lng = person.birth_place?.longitude;
+    const lat = person.birth_place?.latitude;
+    return {
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: [lng, lat],
+      },
+      properties: { ...person, markerRadius: 10 },
+    };
+  }),
+});
+
+const useNotableHumanData = () => {
   const { token, loading } = useContext(AuthContext);
   const API_BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
-  const [allHumans, setAllHumans] = useState([]);
+  const [allHumans, setAllHumans] = useState(null);
   const [dataLoading, setDataLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -14,7 +31,6 @@ const useHumansData = () => {
     if (loading) return; // Wait until the token has been fetched
 
     if (!token) {
-      // Optionally, you can set an error state here if token is required
       setError(new Error("Token not available"));
       setDataLoading(false);
       return;
@@ -26,7 +42,8 @@ const useHumansData = () => {
       cancelToken: source.token,
     })
       .then((response) => {
-        setAllHumans(response.data);
+        // Convert to GeoJSON right here.
+        setAllHumans(convertToGeoJSON(response.data));
         setDataLoading(false);
       })
       .catch((err) => {
@@ -45,4 +62,4 @@ const useHumansData = () => {
   return { allHumans, loading: dataLoading, error };
 };
 
-export default useHumansData;
+export default useNotableHumanData;

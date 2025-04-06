@@ -1,8 +1,9 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { FaFilter, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
+import ListComponent from './ListComponent';
 
-const SidebarComponent = ({ sidebarOpen, setSidebarOpen }) => {
+const SidebarComponent = ({ sidebarOpen, setSidebarOpen, allHumans, selectedListHuman, setSelectedListHuman }) => {
   // Define dimension constants
   const SIDEBAR_WIDTH = 400; // Full width when open
   const BUTTON_SIZE = 50;    // Toggle button size
@@ -58,10 +59,15 @@ const SidebarComponent = ({ sidebarOpen, setSidebarOpen }) => {
         style={sidebarContainerStyle}
       >
         {sidebarOpen && (
-          <div style={{ marginTop: BUTTON_SIZE + 10, padding: 10 }}>
-            <h3>Locations</h3>
-            <p>hello</p>
-            {/* Additional sidebar content */}
+          <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
+            <div style={{ marginTop: BUTTON_SIZE + 10, padding: 10 }}>
+              <h3>Notable Humans</h3>
+              <p>{allHumans.length} Notable Humans (select a name in the list)</p>
+            </div>
+            {/* This container will fill the remaining space */}
+            <div style={{ flex: 1, overflowY: 'auto'}}>
+              <ListComponent humans={allHumans} itemSize={40} selectedListHuman={selectedListHuman} setSelectedListHuman={setSelectedListHuman}/>
+            </div>
           </div>
         )}
       </motion.div>

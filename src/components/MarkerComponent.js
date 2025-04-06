@@ -1,92 +1,31 @@
-// MarkerComponent.js
 import React, { useContext, useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { MapContext } from './MapContext';
+import { getOffset, startPulseAnimation, updateHaloForFeature } from './mapUtils';
 
-/**
- * Converts JSON data to a GeoJSON FeatureCollection.
- * Adds a fixed markerRadius property for unclustered points.
- */
-const convertToGeoJSON = (data) => ({
-  type: 'FeatureCollection',
-  features: data.map((person) => {
-    const lng = person.birth_place?.longitude;
-    const lat = person.birth_place?.latitude;
-    return {
-      type: 'Feature',
-      geometry: {
-        type: 'Point',
-        coordinates: [lng, lat],
-      },
-      properties: { ...person, markerRadius: 10 },
-    };
-  }),
-});
-
-/**
- * Computes the offset for centering the map.
- * Returns an offset if the sidebar is closed, otherwise [0,0].
- */
-const getOffset = (sidebarOpen) => {
-  const sidebarWidth = 400; // Adjust as needed.
-  return sidebarOpen ? [0, 0] : [sidebarWidth / -2, 0];
-};
-
-/**
- * Starts a pulse animation on the current halo feature.
- * The animation updates the feature's `pulseOffset` property over time.
- */
-const startPulseAnimation = (map, currentHaloFeatureRef, pulseAnimationFrameRef) => {
-  // Cancel any existing animation
-  if (pulseAnimationFrameRef.current) {
-    cancelAnimationFrame(pulseAnimationFrameRef.current);
-  }
-  const duration = 2000; // Pulse period in ms.
-  const maxPulse = 10;   // Maximum additional radius.
-  const startTime = performance.now();
-  const animate = (now) => {
-    const t = ((now - startTime) % duration) / duration; // value between 0 and 1.
-    const pulseOffset = maxPulse * Math.abs(Math.sin(t * Math.PI * 2));
-    if (currentHaloFeatureRef.current) {
-      currentHaloFeatureRef.current.properties.pulseOffset = pulseOffset;
-      // Update the halo-feature source with the modified feature.
-      map.getSource('halo-feature').setData(currentHaloFeatureRef.current);
+// Throttle helper: runs func at most once every delay ms.
+const throttle = (func, delay) => {
+  let lastCall = 0;
+  return (...args) => {
+    const now = Date.now();
+    if (now - lastCall >= delay) {
+      lastCall = now;
+      func(...args);
     }
-    pulseAnimationFrameRef.current = requestAnimationFrame(animate);
   };
-  pulseAnimationFrameRef.current = requestAnimationFrame(animate);
-};
-
-/**
- * Updates the halo feature for the clicked marker/cluster.
- * Sets its base radius and starts the pulse animation.
- */
-const updateHaloForFeature = (map, feature, baseRadius, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef) => {
-  const haloFeature = {
-    type: 'Feature',
-    geometry: feature.geometry,
-    properties: {
-      baseRadius: baseRadius,
-      pulseOffset: 0,
-    },
-  };
-  currentHaloFeatureRef.current = haloFeature;
-  map.getSource('halo-feature').setData({
-    type: 'FeatureCollection',
-    features: [haloFeature],
-  });
-  // Mark the halo as persistent.
-  haloPersistRef.current = true;
-  startPulseAnimation(map, currentHaloFeatureRef, pulseAnimationFrameRef);
 };
 
 const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
-  const { map, isAnimatingRef, pulseAnimationFrameRef, haloPersistRef } = useContext(MapContext);
+  const mapContext = useContext(MapContext) || {};
   const sidebarOpenRef = useRef(sidebarOpen);
+  const currentHaloFeatureRef = useRef(null);
+
   useEffect(() => {
     sidebarOpenRef.current = sidebarOpen;
   }, [sidebarOpen]);
-  const currentHaloFeatureRef = useRef(null);
+
+  // if (!mapContext) return null; // Prevent execution until the map is ready.
+  const { map, isAnimatingRef, pulseAnimationFrameRef, haloPersistRef } = mapContext;
 
   useEffect(() => {
     if (!map || !data) return;
@@ -94,12 +33,11 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
 
     // If the humans source doesn't exist, add it and its layers.
     if (!map.getSource(sourceId)) {
-      const geojsonData = convertToGeoJSON(data);
       map.addSource(sourceId, {
         type: 'geojson',
-        data: geojsonData,
+        data: data,
         cluster: true,
-        clusterMaxZoom: 14,
+        clusterMaxZoom: 16,
         clusterRadius: 50,
       });
 
@@ -168,7 +106,7 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
       });
 
       // Define a helper to compute the sidebar offset.
-      const offset = getOffset(sidebarOpenRef.current);
+      const offset = [0,0];//getOffset(sidebarOpenRef.current);
 
       // Cluster click handler.
       map.on('click', 'clusters', (e) => {
@@ -186,21 +124,32 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
           } else if (pointCount >= 30) {
             baseRadius = 25;
           }
-          updateHaloForFeature(
-            map,
-            cluster,
-            baseRadius,
-            haloPersistRef,
-            currentHaloFeatureRef,
-            pulseAnimationFrameRef
+          // Retrieve all leaves (individual features) in the cluster.
+          map.getSource('humans').getClusterLeaves(
+            cluster.properties.cluster_id,
+            pointCount, // retrieve all leaves
+            0,          // starting offset
+            (err, leaves) => {
+              if (err) return;
+              // Update the halo for the cluster.
+              updateHaloForFeature(
+                map,
+                cluster,
+                baseRadius,
+                haloPersistRef,
+                currentHaloFeatureRef,
+                pulseAnimationFrameRef
+              );
+              isAnimatingRef.current = true;
+              // Pass the array of leaves (each a human feature) to openSidebar.
+              openSidebar(leaves);
+              map.easeTo({
+                center: cluster.geometry.coordinates,
+                duration: 500,
+                offset: offset,
+              });
+            }
           );
-          isAnimatingRef.current = true;
-          openSidebar(cluster.properties);
-          map.easeTo({
-            center: cluster.geometry.coordinates,
-            duration: 500,
-            offset: offset,
-          });
         } else {
           // If clusters aren't fully overlapping, expand the cluster.
           const clusterId = cluster.properties.cluster_id;
@@ -221,6 +170,7 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
         const features = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] });
         if (!features.length) return;
         const feature = features[0];
+        openSidebar([feature]);
         updateHaloForFeature(
           map,
           feature,
@@ -232,7 +182,6 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
         const coordinates = feature.geometry.coordinates.slice();
         const currentZoom = map.getZoom();
         isAnimatingRef.current = true;
-        openSidebar(feature.properties);
         map.easeTo({
           center: coordinates,
           zoom: currentZoom,
@@ -256,13 +205,13 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
       });
     } else {
       // If the source already exists, update its data.
-      map.getSource(sourceId).setData(convertToGeoJSON(data));
+      map.getSource(sourceId).setData(data);
     }
   }, [map, data, openSidebar]);
 
-  // Update cluster overlap states (unchanged).
   useEffect(() => {
     if (!map) return;
+
     const updateOverlapStates = () => {
       const clusters = map.queryRenderedFeatures({ layers: ['clusters'] });
       if (!clusters.length) return;
@@ -295,22 +244,17 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
       });
     };
 
-    // Debounce helper.
-    const debounce = (func, delay) => {
-      let timeout;
-      return (...args) => {
-        clearTimeout(timeout);
-        timeout = setTimeout(() => {
-          func(...args);
-        }, delay);
-      };
-    };
+    // Throttle updateOverlapStates to run at most every 150ms.
+    const throttledUpdate = throttle(updateOverlapStates, 150);
 
-    const debouncedUpdate = debounce(updateOverlapStates, 300);
-    map.on('moveend', debouncedUpdate);
-    debouncedUpdate();
+    // Listen to the "move" event instead of "moveend".
+    map.on('move', throttledUpdate);
+
+    // Optionally, run an immediate update.
+    throttledUpdate();
+
     return () => {
-      map.off('moveend', debouncedUpdate);
+      map.off('move', throttledUpdate);
     };
   }, [map]);
 

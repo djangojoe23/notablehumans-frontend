@@ -7,7 +7,7 @@ import { getOffset, updateHaloForFeature } from './mapUtils';
 
 
 // Define triggerHalo here, below the imports.
-const triggerHalo = (map, feature, human, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef) => {
+const triggerHalo = (map, feature, human, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef, setSelectedMarkerHumans) => {
   if (!feature) {
     console.error("triggerHalo called with undefined feature for", human.properties.name);
     return;
@@ -38,6 +38,7 @@ const triggerHalo = (map, feature, human, haloPersistRef, currentHaloFeatureRef,
         );
         isAnimatingRef.current = true;
         console.log("Halo activated on cluster for", human.properties.name);
+        setSelectedMarkerHumans(leaves);
       }
     );
   } else {
@@ -52,21 +53,9 @@ const triggerHalo = (map, feature, human, haloPersistRef, currentHaloFeatureRef,
     );
     isAnimatingRef.current = true;
     console.log("Halo activated on unclustered marker for", human.properties.name);
+    setSelectedMarkerHumans([feature]);
   }
 };
-
-// Calculates the distance in kilometers between two lat/lng points.
-function getDistance(lat1, lon1, lat2, lon2) {
-  const R = 6371; // Earth's radius in km
-  const dLat = (lat2 - lat1) * Math.PI / 180;
-  const dLon = (lon2 - lon1) * Math.PI / 180;
-  const a =
-    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-    Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLon / 2) * Math.sin(dLon / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return R * c; // Distance in kilometers.
-}
 
 /**
  * ListComponent displays a long list of people in a virtualized list,
@@ -78,7 +67,7 @@ function getDistance(lat1, lon1, lat2, lon2) {
  * @param {Object} selectedListHuman - The currently active human object.
  * @param {Function} setSelectedListHuman - Setter function to update the active human.
  */
-const ListComponent = ({ humans=[], itemSize , selectedListHuman, setSelectedListHuman}) => {
+const ListComponent = ({ humans=[], itemSize , selectedListHuman, setSelectedListHuman, setSelectedMarkerHumans}) => {
   const { map, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef } = useContext(MapContext) || {};
 
   // Derive an array from the input. If humans.features exists, use that.
@@ -155,7 +144,16 @@ const handleRowClick = (human) => {
         const newCenterDistance = Math.sqrt(newDeltaLng * newDeltaLng + newDeltaLat * newDeltaLat);
         if (newCenterDistance <= centerThreshold && !animationStopped) {
           console.log("After easing, camera is centered; triggering halo.");
-          triggerHalo(map, feature, human, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef);
+          triggerHalo(
+              map,
+              feature,
+              human,
+              haloPersistRef,
+              currentHaloFeatureRef,
+              pulseAnimationFrameRef,
+              isAnimatingRef,
+              setSelectedMarkerHumans
+          );
           map.stop();
           animationStopped = true;
         }
@@ -174,7 +172,16 @@ const handleRowClick = (human) => {
         recheckAfterEasing();
       } else if (!animationStopped) {
         console.log("Marker is unclustered and camera is centered; triggering halo.");
-        triggerHalo(map, feature, human, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef);
+        triggerHalo(
+            map,
+            feature,
+            human,
+            haloPersistRef,
+            currentHaloFeatureRef,
+            pulseAnimationFrameRef,
+            isAnimatingRef,
+            setSelectedMarkerHumans
+        );
         map.stop();
         animationStopped = true;
       }
@@ -192,7 +199,16 @@ const handleRowClick = (human) => {
           recheckAfterEasing();
         } else if (!animationStopped) {
           console.log("Cluster is fully overlapping and camera is centered; triggering halo.");
-          triggerHalo(map, feature, human, haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef);
+          triggerHalo(
+              map,
+              feature,
+              human,
+              haloPersistRef,
+              currentHaloFeatureRef,
+              pulseAnimationFrameRef,
+              isAnimatingRef,
+              setSelectedMarkerHumans
+          );
           map.stop();
           animationStopped = true;
         }

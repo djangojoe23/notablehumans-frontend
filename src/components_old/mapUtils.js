@@ -56,3 +56,4 @@ export const updateHaloForFeature = (map, feature, baseRadius, haloPersistRef, c
   haloPersistRef.current = true;
   startPulseAnimation(map, currentHaloFeatureRef, pulseAnimationFrameRef);
 };
+

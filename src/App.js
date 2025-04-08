@@ -1,78 +1,55 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
+import axios from "axios";
+import Header from './components/Header';
+import Sidebar from './components/Sidebar';
+import Globe from './components/Globe';
 import './App.css';
-import HeaderComponent from './components/HeaderComponent';
-import SidebarComponent from './components/SidebarComponent';
-import GlobeComponent from './components/GlobeComponent';
-import MarkerComponent from './components/MarkerComponent';
-import useNotableHumanData from './components/useNotableHumanData';
-import { MapContext } from './components/MapContext';
 
 function App() {
-    const [sidebarOpen, setSidebarOpen] = useState(false);
-    const [selectedMarkerHumans, setSelectedMarkerHumans] = useState(null);
-    const [selectedListHuman, setSelectedListHuman] = useState(null);
-    const { allHumans, loading, error } = useNotableHumanData();
-    const [mapContextValue, setMapContextValue] = useState(null);
+  const mapRef = useRef(null);
+  const [notableHumans, setNotableHumans] = useState(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [error, setError] = useState(null);
 
+  useEffect(() => {
+    axios
+      .get("http://127.0.0.1:8000/api/notable-humans-geojson/")
+      .then((res) => {
+      console.log("📦 API response:", res.data);
 
-    if (loading) return <div>Loading data...</div>;
-    if (error) return <div>Error loading data. Please try again.</div>;
+          // optional: check programmatically
+          if (Array.isArray(res.data)) {
+            console.warn("⚠️ Received a plain array, not a GeoJSON FeatureCollection.");
+          } else if (res.data.type === "FeatureCollection" && Array.isArray(res.data.features)) {
+            console.log("✅ Proper GeoJSON FeatureCollection");
+          } else {
+            console.error("❌ Unexpected response format:", res.data);
+          }
 
-    // This callback is passed to MarkerComponent.
-    const openSidebar = (humansData) => {
-        console.log("opening sidebar")
-        setSelectedMarkerHumans(humansData);
-        setSidebarOpen(true);
-        // setSelectedListHuman(null)
-    };
+          setNotableHumans(res.data);
+        })
+      .catch((err) => {
+        console.error("Error fetching GeoJSON", err);
+        setError("Failed to load data");
+      });
+  }, []);
 
-    // Callback to clear the sidebar selection.
-    const clearSidebar = () => {
-        setSelectedMarkerHumans(null);
-    };
+  if (error) return <div>{error}</div>;
+  if (!notableHumans) return <div>Loading...</div>;
 
-    // When no marker is selected, sidebar shows the full list.
-    const sidebarData = selectedMarkerHumans || (allHumans.features || []);
-
-    return (
-        <MapContext.Provider value={mapContextValue}>
-            <div style={{ display: 'flex', flexDirection: 'column', height: '100vh', overflow: 'hidden'}}>
-
-                <HeaderComponent />
-
-                <div style={{ height: 'calc(100vh - 60px)', display: 'flex', flexDirection: 'row' }}>
-
-                    <SidebarComponent
-                        sidebarOpen={sidebarOpen}
-                        setSidebarOpen={setSidebarOpen}
-                        allHumans={sidebarData}
-                        selectedListHuman={selectedListHuman}
-                        setSelectedListHuman={setSelectedListHuman}
-                    />
-
-                    <div style={{
-                        flex: 1,
-                        position: 'relative',
-                        minWidth: 0,
-                    }}>
-
-                        <GlobeComponent
-                            clearSidebar={clearSidebar}
-                            onMapReady={setMapContextValue}
-                            selectedMarkerHumans={selectedMarkerHumans}
-                            selectedListHuman={selectedListHuman}
-                        >
-                            <MarkerComponent
-                                data={allHumans}
-                                sidebarOpen={sidebarOpen}
-                                openSidebar={openSidebar}
-                            />
-                        </GlobeComponent>
-                    </div>
-                </div>
-            </div>
-        </MapContext.Provider>
-    );
+  return (
+    <div className="app-container">
+      <Header />
+      <div className="main-content">
+        <Globe mapRef={mapRef} notableHumans={notableHumans} />
+        <Sidebar
+          mapRef={mapRef}
+          sidebarOpen={sidebarOpen}
+          setSidebarOpen={setSidebarOpen}
+        />
+      </div>
+    </div>
+  );
 }
 
 export default App;

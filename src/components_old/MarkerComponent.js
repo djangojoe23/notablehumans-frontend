@@ -15,7 +15,21 @@ const throttle = (func, delay) => {
   };
 };
 
-const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
+const clearHalo = (map, haloPersistRef, pulseAnimationFrameRef) => {
+  if (pulseAnimationFrameRef.current) {
+    cancelAnimationFrame(pulseAnimationFrameRef.current);
+    pulseAnimationFrameRef.current = null;
+  }
+  if (map.getSource('halo-feature')) {
+    map.getSource('halo-feature').setData({
+      type: 'FeatureCollection',
+      features: []
+    });
+  }
+  haloPersistRef.current = false;
+};
+
+const MarkerComponent = ({ data, sidebarOpen, openSidebar, setSelectedListHuman }) => {
   const mapContext = useContext(MapContext) || {};
   const sidebarOpenRef = useRef(sidebarOpen);
   const currentHaloFeatureRef = useRef(null);
@@ -46,7 +60,7 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
         id: 'clusters',
         type: 'circle',
         source: sourceId,
-        filter: ['has', 'point_count'],
+        // filter: ['has', 'point_count'],
         paint: {
           'circle-color': [
             'case',
@@ -71,7 +85,7 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
         id: 'cluster-count',
         type: 'symbol',
         source: sourceId,
-        filter: ['has', 'point_count'],
+        // filter: ['has', 'point_count'],
         layout: {
           'text-field': '{point_count_abbreviated}',
           'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
@@ -79,31 +93,31 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
         },
       });
 
-      // Add unclustered points.
-      map.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: sourceId,
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': '#f28cb1',
-          'circle-radius': 10,
-        },
-      });
-
-      // Add a symbol layer for the "1" label on unclustered points.
-      map.addLayer({
-        id: 'unclustered-count',
-        type: 'symbol',
-        source: sourceId,
-        filter: ['!', ['has', 'point_count']],
-        layout: {
-          'text-field': '1',
-          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
-          'text-size': 12,
-          'text-offset': [0, 0],
-        },
-      });
+      // // Add unclustered points.
+      // map.addLayer({
+      //   id: 'unclustered-point',
+      //   type: 'circle',
+      //   source: sourceId,
+      //   filter: ['!', ['has', 'point_count']],
+      //   paint: {
+      //     'circle-color': '#f28cb1',
+      //     'circle-radius': 10,
+      //   },
+      // });
+      //
+      // // Add a symbol layer for the "1" label on unclustered points.
+      // map.addLayer({
+      //   id: 'unclustered-count',
+      //   type: 'symbol',
+      //   source: sourceId,
+      //   filter: ['!', ['has', 'point_count']],
+      //   layout: {
+      //     'text-field': '1',
+      //     'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+      //     'text-size': 12,
+      //     'text-offset': [0, 0],
+      //   },
+      // });
 
       // Define a helper to compute the sidebar offset.
       const offset = [0,0];//getOffset(sidebarOpenRef.current);
@@ -111,9 +125,27 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
       // Cluster click handler.
       map.on('click', 'clusters', (e) => {
         e.originalEvent.stopPropagation();
+
         const features = map.queryRenderedFeatures(e.point, { layers: ['clusters'] });
         if (!features.length) return;
         const cluster = features[0];
+
+        // If a halo is active, check if it's on the same cluster.
+        if (haloPersistRef.current) {
+          // For clusters, we assume currentHaloFeatureRef.current is a cluster if it has point_count.
+          if (currentHaloFeatureRef.current &&
+              currentHaloFeatureRef.current.properties.point_count &&
+              currentHaloFeatureRef.current.id === cluster.id) {
+            console.log("Halo already active for this cluster; ignoring click.");
+            return;
+          } else {
+            console.log("Different cluster clicked; clearing old halo.");
+            clearHalo(map, haloPersistRef, pulseAnimationFrameRef);
+            currentHaloFeatureRef.current = null;
+          }
+        }
+
+
         const state = map.getFeatureState({ source: 'humans', id: cluster.id });
         if (state && state.fullyOverlapping === true) {
           // Compute base radius for clusters based on point count.
@@ -143,6 +175,8 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
               isAnimatingRef.current = true;
               // Pass the array of leaves (each a human feature) to openSidebar.
               openSidebar(leaves);
+              currentHaloFeatureRef.current = cluster;
+              haloPersistRef.current = true;
               map.easeTo({
                 center: cluster.geometry.coordinates,
                 duration: 500,
@@ -166,11 +200,43 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
 
       // Unclustered point click handler.
       map.on('click', 'unclustered-point', (e) => {
+
         e.originalEvent.stopPropagation();
+
         const features = map.queryRenderedFeatures(e.point, { layers: ['unclustered-point'] });
         if (!features.length) return;
         const feature = features[0];
+
+        // Check if a halo is active.
+        if (haloPersistRef.current) {
+          // Determine if the active halo is from a cluster or unclustered marker.
+          const activeIsCluster = currentHaloFeatureRef.current && currentHaloFeatureRef.current.properties.point_count;
+
+          if (!activeIsCluster) {
+            // Active halo is unclustered.
+            if (currentHaloFeatureRef.current &&
+                currentHaloFeatureRef.current.properties.wikidata_id === feature.properties.wikidata_id) {
+              console.log("Halo already active for this marker; ignoring click.");
+              return;
+            } else {
+              console.log("Different unclustered marker clicked; clearing old halo.");
+              clearHalo(map, haloPersistRef, pulseAnimationFrameRef);
+              currentHaloFeatureRef.current = null;
+            }
+          } else {
+            // Active halo is from a cluster—always clear it before processing an unclustered click.
+            console.log("Active halo is a cluster; clearing halo for new unclustered marker click.");
+            clearHalo(map, haloPersistRef, pulseAnimationFrameRef);
+            currentHaloFeatureRef.current = null;
+          }
+        }
+
+        // Proceed with activating the new halo.
         openSidebar([feature]);
+        if (typeof setSelectedListHuman === 'function') {
+          setSelectedListHuman(feature);
+        }
+
         updateHaloForFeature(
           map,
           feature,
@@ -179,6 +245,9 @@ const MarkerComponent = ({ data, sidebarOpen, openSidebar }) => {
           currentHaloFeatureRef,
           pulseAnimationFrameRef
         );
+        currentHaloFeatureRef.current = feature;
+        haloPersistRef.current = true;
+
         const coordinates = feature.geometry.coordinates.slice();
         const currentZoom = map.getZoom();
         isAnimatingRef.current = true;

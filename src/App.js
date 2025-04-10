@@ -9,7 +9,15 @@ function App() {
   const mapRef = useRef(null);
   const [notableHumans, setNotableHumans] = useState(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTrigger, setSidebarTrigger] = useState(null); // 'marker' or 'button'
   const [error, setError] = useState(null);
+
+  const [selectedClusterHumans, setSelectedClusterHumans] = useState([]);
+  const [lastMarkerCoordinates, setLastMarkerCoordinates] = useState(null);
+  const [pendingClusterExpansion, setPendingClusterExpansion] = useState(null); // { coordinates, clusterId }
+
+
+
 
   useEffect(() => {
     axios
@@ -41,11 +49,28 @@ function App() {
     <div className="app-container">
       <Header />
       <div className="main-content">
-        <Globe mapRef={mapRef} notableHumans={notableHumans} />
+        <Globe
+            mapRef={mapRef}
+            notableHumans={notableHumans}
+            setSelectedClusterHumans={setSelectedClusterHumans}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            sidebarTrigger={sidebarTrigger}
+            setSidebarTrigger={setSidebarTrigger}
+            lastMarkerCoordinates={lastMarkerCoordinates}
+            setLastMarkerCoordinates={setLastMarkerCoordinates}
+            pendingClusterExpansion={pendingClusterExpansion}
+            setPendingClusterExpansion={setPendingClusterExpansion}
+        />
         <Sidebar
-          mapRef={mapRef}
-          sidebarOpen={sidebarOpen}
-          setSidebarOpen={setSidebarOpen}
+            sidebarOpen={sidebarOpen}
+            setSidebarOpen={setSidebarOpen}
+            sidebarTrigger={sidebarTrigger}
+            setSidebarTrigger={setSidebarTrigger}
+            humansAtMarker={selectedClusterHumans}
+            lastMarkerCoordinates={lastMarkerCoordinates}
+            pendingClusterExpansion={pendingClusterExpansion}
+            setPendingClusterExpansion={setPendingClusterExpansion}
         />
       </div>
     </div>

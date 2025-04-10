@@ -1,36 +1,36 @@
+// Globe.js
 import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
-import 'mapbox-gl/dist/mapbox-gl.css';
 import { SIDEBAR_WIDTH } from '../constants/layout';
-
+import updateClusterVisualStates from '../utils/updateClusterVisualStates';
+import useClusterExpansion from '../hooks/useClusterExpansion';
+import useSidebarMapPadding from '../hooks/useSidebarMapPadding';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 const Globe = ({
-                 mapRef,
-                 notableHumans,
-                 setSelectedClusterHumans,
-                 sidebarOpen,
-                 setSidebarOpen,
-                 sidebarTrigger,
-                 setSidebarTrigger,
-                 lastMarkerCoordinates,
-                 setLastMarkerCoordinates,
-                 pendingClusterExpansion,
-                 setPendingClusterExpansion
-              }) => {
-  const MAPBOX_TOKEN = process.env.REACT_APP_MAPBOX_API_TOKEN;
-  const MAPBOX_USERNAME = process.env.REACT_APP_MAPBOX_USER;
-  const MAPBOX_STYLE_ID = process.env.REACT_APP_MAPBOX_STYLE_ID;
-
+  globeRef,
+  notableHumans,
+  setSelectedClusterHumans,
+  sidebarOpen,
+  setSidebarOpen,
+  sidebarTrigger,
+  setSidebarTrigger,
+  lastMarkerCoordinates,
+  setLastMarkerCoordinates,
+  pendingClusterExpansion,
+  setPendingClusterExpansion
+}) => {
   const containerRef = useRef(null);
+  const didFlyToCluster = useRef(false);
 
+  // === Restore map initialization ===
   useEffect(() => {
     if (!containerRef.current) return;
 
-    mapboxgl.accessToken = MAPBOX_TOKEN;
-
-    const map = new mapboxgl.Map({
+    const globe = new mapboxgl.Map({
       container: containerRef.current,
-      style: `mapbox://styles/${MAPBOX_USERNAME}/${MAPBOX_STYLE_ID}`,
+      style: `mapbox://styles/${process.env.REACT_APP_MAPBOX_USER}/${process.env.REACT_APP_MAPBOX_STYLE_ID}`,
+      accessToken: process.env.REACT_APP_MAPBOX_API_TOKEN,
       center: [0, 0],
       zoom: 2,
       minZoom: 2,
@@ -38,19 +38,18 @@ const Globe = ({
       projection: 'globe',
     });
 
-    mapRef.current = map;
+    globeRef.current = globe;
 
-    map.on('load', () => {
-      map.addSource('humans', {
+    globe.on('load', () => {
+      globe.addSource('humans', {
         type: 'geojson',
         data: notableHumans,
         cluster: true,
         clusterMaxZoom: 20,
         clusterRadius: 50,
-        promoteId: 'cluster_id',
       });
 
-      map.addLayer({
+      globe.addLayer({
         id: 'clusters',
         type: 'circle',
         source: 'humans',
@@ -72,7 +71,7 @@ const Globe = ({
         },
       });
 
-      map.addLayer({
+      globe.addLayer({
         id: 'cluster-count',
         type: 'symbol',
         source: 'humans',
@@ -84,7 +83,7 @@ const Globe = ({
         },
       });
 
-      map.addLayer({
+      globe.addLayer({
         id: 'unclustered-point',
         type: 'circle',
         source: 'humans',
@@ -97,237 +96,91 @@ const Globe = ({
         },
       });
 
-      const updateClusterVisualStates = () => {
-        const map = mapRef.current;
-        if (!map) return;
+      globe.on('moveend', () => setTimeout(() => updateClusterVisualStates(globe), 100));
+      updateClusterVisualStates(globe);
 
-        if (!map.getLayer('clusters')) return; // ✅ prevent crash on early call
+      globe.on('click', 'clusters', (e) => {
+        const cluster = globe.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
+        if (!cluster) return;
 
-        const clusters = map.queryRenderedFeatures({ layers: ['clusters'] });
-        if (!clusters.length) return;
-
-        const pixelPadding = 150;
-        const bounds = map.getBounds();
-        const sw = map.project(bounds.getSouthWest());
-        const ne = map.project(bounds.getNorthEast());
-
-        const expandedBounds = new mapboxgl.LngLatBounds(
-          map.unproject(new mapboxgl.Point(sw.x - pixelPadding, sw.y + pixelPadding)),
-          map.unproject(new mapboxgl.Point(ne.x + pixelPadding, ne.y - pixelPadding))
-        );
-
-        clusters.forEach((cluster) => {
-          const clusterId = cluster.properties.cluster_id;
-          const clusterCoordinates = cluster.geometry.coordinates;
-
-          if (!expandedBounds.contains(new mapboxgl.LngLat(...clusterCoordinates))) return;
-
-          const pointCount = cluster.properties.point_count;
-
-          map.getSource('humans').getClusterLeaves(clusterId, pointCount, 0, (err, leaves) => {
-            if (err) return;
-
-            const clusterPoint = map.project(new mapboxgl.LngLat(...clusterCoordinates));
-
-            const zoom = map.getZoom();
-            const pixelTolerance =
-              zoom < 3 ? 4 :
-              zoom < 5 ? 6 :
-              8;
-
-            const geoTolerance = 0.01; // degrees of lat/lng (about 1km-ish)
-
-            const allOverlap = leaves.every((leaf) => {
-              const [leafLng, leafLat] = leaf.geometry.coordinates;
-              const dLng = Math.abs(leafLng - clusterCoordinates[0]);
-              const dLat = Math.abs(leafLat - clusterCoordinates[1]);
-
-              if (dLng > geoTolerance || dLat > geoTolerance) return false;
-
-              const leafPoint = map.project(new mapboxgl.LngLat(leafLng, leafLat));
-              const dx = leafPoint.x - clusterPoint.x;
-              const dy = leafPoint.y - clusterPoint.y;
-              return Math.sqrt(dx * dx + dy * dy) < pixelTolerance;
-            });
-
-            map.setFeatureState(
-              { source: 'humans', id: clusterId },
-              { fullyOverlapping: allOverlap }
-            );
-          });
-        });
-      };
-
-      map.on('moveend', () => {
-        setTimeout(updateClusterVisualStates, 100);
-      });
-
-      updateClusterVisualStates(); // Run immediately on load
-
-      map.on('click', 'clusters', (e) => {
-        const features = map.queryRenderedFeatures(e.point, {
-          layers: ['clusters'],
-        });
-        if (!features.length) return;
-
-        const cluster = features[0];
-        const clusterId = cluster.properties.cluster_id;
+        const { cluster_id: clusterId } = cluster.properties;
         const coordinates = cluster.geometry.coordinates;
 
-        setLastMarkerCoordinates(coordinates);
+        if (!pendingClusterExpansion) setLastMarkerCoordinates(coordinates);
+
         setSidebarTrigger('marker');
 
-        // Fetch all cluster leaves
-        map.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+        globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
           if (err) return;
-
-          const sorted = leaves
-            .map((leaf) => leaf.properties)
-            .sort((a, b) => a.name.localeCompare(b.name));
-
+          const sorted = leaves.map(l => l.properties).sort((a, b) => a.name.localeCompare(b.name));
           setSelectedClusterHumans(sorted);
         });
 
-        const state = map.getFeatureState({ source: 'humans', id: clusterId });
-        const isFullyOverlapping = state?.fullyOverlapping;
-        if (sidebarOpen) {
-          // If sidebar is already open, zoom immediately
+        const state = globe.getFeatureState({ source: 'humans', id: clusterId });
+        const isFullyOverlapping = state?.fullyOverlapping ?? false;
 
-          if (isFullyOverlapping) {
-            map.flyTo({
-              center: coordinates,
-              speed: 0.8,
-              curve: 1.4,
-              essential: true,
-            });
-          } else {
-            map.getSource('humans').getClusterExpansionZoom(clusterId, (err, zoom) => {
-              if (err) return;
-              map.flyTo({
-                center: coordinates,
-                zoom,
-                speed: 0.8,
-                curve: 1.4,
-                essential: true,
-              });
-            });
-          }
-        } else {
-          // Defer zoom until sidebar opens
-          setSidebarOpen(true);
-          setPendingClusterExpansion({ clusterId, coordinates, isFullyOverlapping });
-        }
+        setPendingClusterExpansion({ clusterId, coordinates, isFullyOverlapping });
+
+        if (!sidebarOpen) setSidebarOpen(true);
       });
 
-      map.on('click', 'unclustered-point', (e) => {
+      globe.on('click', 'unclustered-point', (e) => {
         const feature = e.features?.[0];
         if (!feature) return;
 
-        const human = feature.properties;
-
-        setSelectedClusterHumans([human]);
-        setSidebarTrigger('marker');
-        setSidebarOpen(true);
         const coordinates = feature.geometry.coordinates;
+        setSidebarTrigger('marker');
+        setSelectedClusterHumans([feature.properties]);
         setLastMarkerCoordinates(coordinates);
 
-        map.flyTo({
-          center: coordinates,
-          speed: 1.2,
-          curve: 1.4,
-          essential: true,
-        });
-
+        if (sidebarOpen) {
+          globe.easeTo({
+            center: coordinates,
+            padding: { left: SIDEBAR_WIDTH, right: 0, top: 0, bottom: 0 },
+            duration: 600,
+            easing: t => t,
+            essential: true,
+          });
+        } else {
+          setSidebarOpen(true);
+        }
       });
 
-
-      map.on('mouseenter', 'clusters', () => {
-        map.getCanvas().style.cursor = 'pointer';
-      });
-      map.on('mouseleave', 'clusters', () => {
-        map.getCanvas().style.cursor = '';
-      });
+      globe.on('mouseenter', 'clusters', () => globe.getCanvas().style.cursor = 'pointer');
+      globe.on('mouseleave', 'clusters', () => globe.getCanvas().style.cursor = '');
+      globe.on('mouseenter', 'unclustered-point', () => globe.getCanvas().style.cursor = 'pointer');
+      globe.on('mouseleave', 'unclustered-point', () => globe.getCanvas().style.cursor = '');
     });
 
-    // Resize handling
-    const handleResize = () => map.resize();
+    const handleResize = () => globe.resize();
     window.addEventListener('resize', handleResize);
 
     return () => {
       window.removeEventListener('resize', handleResize);
-      map.remove();
-      mapRef.current = null;
+      globe.remove();
+      globeRef.current = null;
     };
-  }, [mapRef, notableHumans, setSelectedClusterHumans, setSidebarOpen, MAPBOX_TOKEN, MAPBOX_USERNAME, MAPBOX_STYLE_ID]);
+  }, [notableHumans]);
 
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map || !sidebarOpen || !pendingClusterExpansion) return;
+  // === Cluster expansion hook ===
+  useClusterExpansion({
+    globeRef,
+    sidebarOpen,
+    sidebarTrigger,
+    pendingClusterExpansion,
+    setPendingClusterExpansion,
+    setLastMarkerCoordinates
+  });
 
-    const { clusterId, coordinates, isFullyOverlapping } = pendingClusterExpansion;
-
-    setTimeout(() => {
-      if (isFullyOverlapping) {
-        // Just center the map without zooming
-        map.flyTo({
-          center: coordinates,
-          padding: {
-            left: SIDEBAR_WIDTH,
-            right: 0,
-            top: 0,
-            bottom: 0,
-          },
-          speed: 0.8,
-          curve: 1.4,
-          essential: true,
-        });
-
-        setPendingClusterExpansion(null);
-      } else {
-        // Expand the cluster normally
-        map.getSource('humans').getClusterExpansionZoom(clusterId, (err, zoom) => {
-          if (err) return;
-
-          map.flyTo({
-            center: coordinates,
-            zoom,
-            padding: {
-              left: SIDEBAR_WIDTH,
-              right: 0,
-              top: 0,
-              bottom: 0,
-            },
-            speed: 0.8,
-            curve: 1.4,
-            essential: true,
-          });
-
-          setPendingClusterExpansion(null);
-        });
-      }
-    }, 300);
-  }, [sidebarOpen, pendingClusterExpansion]);
-
-
-
-  useEffect(() => {
-    const map = mapRef.current;
-    if (!map) return;
-
-    if (!sidebarOpen && sidebarTrigger === 'button') {
-      // Sidebar just closed — reset padding with current center
-      map.easeTo({
-        center: map.getCenter(),
-        padding: {
-          left: 0,
-          right: 0,
-          top: 0,
-          bottom: 0,
-        },
-        duration: 1000,
-      });
-    }
-  }, [sidebarOpen, sidebarTrigger, mapRef]);
+  // apply flyTo/padding behavior when sidebar is opened/closed
+  useSidebarMapPadding({
+    globeRef,
+    sidebarOpen,
+    sidebarTrigger,
+    lastMarkerCoordinates,
+    pendingClusterExpansion,
+    didFlyToCluster
+  });
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

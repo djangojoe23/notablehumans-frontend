@@ -3,25 +3,24 @@ import axios from "axios";
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Globe from './components/Globe';
+import useGlobeState from './hooks/useGlobeState';
 import './App.css';
 
 function App() {
-  const mapRef = useRef(null);
-  const [notableHumans, setNotableHumans] = useState(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTrigger, setSidebarTrigger] = useState(null); // 'marker' or 'button'
-  const [error, setError] = useState(null);
-
-  const [selectedClusterHumans, setSelectedClusterHumans] = useState([]);
-  const [lastMarkerCoordinates, setLastMarkerCoordinates] = useState(null);
-  const [pendingClusterExpansion, setPendingClusterExpansion] = useState(null); // { coordinates, clusterId }
-
-
-
+  const {
+    globeRef,
+    notableHumans, setNotableHumans,
+    error, setError,
+    sidebarOpen, setSidebarOpen,
+    sidebarTrigger, setSidebarTrigger,
+    selectedClusterHumans, setSelectedClusterHumans,
+    lastMarkerCoordinates, setLastMarkerCoordinates,
+    pendingClusterExpansion, setPendingClusterExpansion
+  } = useGlobeState();
 
   useEffect(() => {
     axios
-      .get("http://127.0.0.1:8000/api/notable-humans-geojson/")
+      .get(`${process.env.REACT_APP_API_URL}/notable-humans-geojson/`)
       .then((res) => {
       console.log("📦 API response:", res.data);
 
@@ -50,7 +49,7 @@ function App() {
       <Header />
       <div className="main-content">
         <Globe
-            mapRef={mapRef}
+            globeRef={globeRef}
             notableHumans={notableHumans}
             setSelectedClusterHumans={setSelectedClusterHumans}
             sidebarOpen={sidebarOpen}

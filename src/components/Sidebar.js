@@ -6,6 +6,36 @@ import AutoSizer from 'react-virtualized-auto-sizer';
 import { FaFilter, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
 
+// Utility: only shows a tooltip if the text is visually truncated
+const OverflowTooltip = ({ children, tooltipText }) => {
+  const textRef = React.useRef(null);
+  const [isTruncated, setIsTruncated] = React.useState(false);
+
+  React.useEffect(() => {
+    const el = textRef.current;
+    if (el) {
+      setIsTruncated(el.scrollWidth > el.clientWidth);
+    }
+  }, [children]);
+
+  return (
+    <div
+      ref={textRef}
+      title={isTruncated ? tooltipText : ''}
+      style={{
+        whiteSpace: 'nowrap',
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        maxWidth: '100%',
+        display: 'block',
+        // cursor: 'default',
+      }}
+    >
+      {children}
+    </div>
+  );
+};
+
 /**
  * Sidebar slide-out panel to show people at a selected marker/cluster.
  */
@@ -17,7 +47,9 @@ const Sidebar = ({
   humansAtMarker,
   lastMarkerCoordinates,
   pendingClusterExpansion,
-  setPendingClusterExpansion
+  setPendingClusterExpansion,
+  sidebarMode,
+  onSelectPerson
 }) => {
   // === Render one row in the scrollable list ===
   const renderHumanRow = ({ index, style }) => {
@@ -25,17 +57,24 @@ const Sidebar = ({
     return (
       <div
         key={human.wikidata_id}
+        onClick={() => onSelectPerson?.(human)}
         style={{
-          ...style,
-          display: 'flex',
-          alignItems: 'center',
-          borderBottom: '1px solid #ddd',
-          padding: '0 10px',
-          fontSize: 14,
-          fontWeight: 500,
+            ...style,
+            display: 'flex',
+            alignItems: 'center',
+            borderBottom: '1px solid #ddd',
+            padding: '0 10px',
+            fontSize: 14,
+            fontWeight: 500,
+            cursor: 'pointer',
+            width: '100%',
+            overflow: 'hidden',
+            boxSizing: 'border-box'
         }}
       >
-        {human.name} {human.birth_year ? `(${human.birth_year})` : ''}
+        <OverflowTooltip tooltipText={human.name}>
+          {human.name} {human.birth_year ? `(${human.birth_year})` : ''}
+        </OverflowTooltip>
       </div>
     );
   };
@@ -66,22 +105,26 @@ const Sidebar = ({
       >
         {/* Header */}
         <div style={{ marginTop: BUTTON_SIZE + 10, padding: 10 }}>
-          <h3>Notable Humans</h3>
+            <h3>
+              {sidebarMode === 'all' ? 'All Notable Humans' : 'People at This Location'}
+            </h3>
         </div>
 
         {/* List container */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, padding: '0 10px' }}>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowX: 'hidden', }}>
           {humansAtMarker.length > 0 ? (
             <AutoSizer>
               {({ height, width }) => (
-                <List
-                  height={height}
-                  itemCount={humansAtMarker.length}
-                  itemSize={40}
-                  width={width}
-                >
-                  {renderHumanRow}
-                </List>
+                <div className="sidebar-list-container" style={{ width: width, overflowX: 'hidden' }}>
+                    <List
+                      height={height}
+                      itemCount={humansAtMarker.length}
+                      itemSize={40}
+                      width={width}
+                    >
+                      {renderHumanRow}
+                    </List>
+                </div>
               )}
             </AutoSizer>
           ) : (

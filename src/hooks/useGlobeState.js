@@ -8,12 +8,19 @@ const useGlobeState = () => {
 
   const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar visibility
   const [sidebarTrigger, setSidebarTrigger] = useState(null); // What triggered the sidebar
+  const [sidebarMode, setSidebarMode] = useState('all'); // 'all' | 'location'
+  const sidebarModeRef = useRef(null);
 
   const [selectedClusterHumans, setSelectedClusterHumans] = useState([]); // Data shown in sidebar
   const [lastMarkerCoordinates, setLastMarkerCoordinates] = useState(null); // Last marker/cluster clicked
+  const lastMarkerCoordinatesRef = useRef(null);
 
   const [pendingClusterExpansion, setPendingClusterExpansion] = useState(null);
   // { clusterId, coordinates, isFullyOverlapping }
+
+  const focusedZoomRef = useRef(null);
+
+
 
   return {
     globeRef,
@@ -21,9 +28,11 @@ const useGlobeState = () => {
     error, setError,
     sidebarOpen, setSidebarOpen,
     sidebarTrigger, setSidebarTrigger,
+    sidebarMode, setSidebarMode,
     selectedClusterHumans, setSelectedClusterHumans,
     lastMarkerCoordinates, setLastMarkerCoordinates,
     pendingClusterExpansion, setPendingClusterExpansion,
+    focusedZoomRef, lastMarkerCoordinatesRef, sidebarModeRef,
   };
 };
 

@@ -18,7 +18,10 @@ const Globe = ({
   lastMarkerCoordinates,
   setLastMarkerCoordinates,
   pendingClusterExpansion,
-  setPendingClusterExpansion
+  setPendingClusterExpansion,
+  sidebarMode,
+  setSidebarMode,
+  focusedZoomRef, lastMarkerCoordinatesRef, sidebarModeRef,
 }) => {
   const containerRef = useRef(null);
   const didFlyToCluster = useRef(false);
@@ -96,7 +99,48 @@ const Globe = ({
         },
       });
 
-      globe.on('moveend', () => setTimeout(() => updateClusterVisualStates(globe), 100));
+      globe.on('moveend', () => {
+        setTimeout(() => updateClusterVisualStates(globe), 100);
+
+        const currentMode = sidebarModeRef.current;
+        const lastCoords = lastMarkerCoordinatesRef.current;
+
+        console.log(lastCoords, currentMode)
+        if (currentMode !== 'location' || !lastCoords) return;
+        console.log("heree!")
+        const center = globe.getCenter();
+        const currentZoom = globe.getZoom();
+        const focusedZoom = focusedZoomRef.current ?? currentZoom;
+
+        const screenCenter = globe.project(center);
+        const screenTarget = globe.project(new mapboxgl.LngLat(...lastCoords));
+
+        const dx = screenCenter.x - screenTarget.x;
+        const dy = screenCenter.y - screenTarget.y;
+        const pixelDistance = Math.sqrt(dx * dx + dy * dy);
+
+        const hasMovedAway = pixelDistance > 30;
+
+        const zoomDiff = Math.abs(currentZoom - focusedZoom);
+        const isZoomedOut = zoomDiff > 0.1;
+
+        if (hasMovedAway || isZoomedOut) {
+          const all = notableHumans?.features?.map(f => ({
+            ...f.properties,
+            lat: f.geometry.coordinates[1],
+            lng: f.geometry.coordinates[0],
+          })) ?? [];
+          const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
+          setSelectedClusterHumans(sorted);
+          setLastMarkerCoordinates(null);
+          setPendingClusterExpansion(null);
+          setSidebarMode('all');
+          sidebarModeRef.current = null;
+          lastMarkerCoordinatesRef.current = null;
+          focusedZoomRef.current = null;
+        }
+      });
+
       updateClusterVisualStates(globe);
 
       globe.on('click', 'clusters', (e) => {
@@ -107,19 +151,43 @@ const Globe = ({
         const coordinates = cluster.geometry.coordinates;
 
         if (!pendingClusterExpansion) setLastMarkerCoordinates(coordinates);
-
         setSidebarTrigger('marker');
 
-        globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-          if (err) return;
-          const sorted = leaves.map(l => l.properties).sort((a, b) => a.name.localeCompare(b.name));
-          setSelectedClusterHumans(sorted);
-        });
-
+        // Get the feature state
         const state = globe.getFeatureState({ source: 'humans', id: clusterId });
         const isFullyOverlapping = state?.fullyOverlapping ?? false;
 
+        // Always update expansion logic
         setPendingClusterExpansion({ clusterId, coordinates, isFullyOverlapping });
+
+        // === ✨ Sidebar content behavior ===
+        if (isFullyOverlapping) {
+          setSidebarMode('location');
+          sidebarModeRef.current = 'location';
+
+          focusedZoomRef.current = globe.getZoom();
+          globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+            if (err) return;
+            const sorted = leaves.map(leaf => ({
+              ...leaf.properties,
+              lat: leaf.geometry.coordinates[1],
+              lng: leaf.geometry.coordinates[0],
+            })).sort((a, b) => a.name.localeCompare(b.name));
+
+            setSelectedClusterHumans(sorted);
+            lastMarkerCoordinatesRef.current = coordinates;
+          });
+        } else {
+          // Not fully overlapping — show everyone from the full dataset
+          setSidebarMode('all');
+          const all = notableHumans?.features?.map(f => ({
+            ...f.properties,
+            lat: f.geometry.coordinates[1],
+            lng: f.geometry.coordinates[0],
+          })) ?? [];
+          const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
+          setSelectedClusterHumans(sorted);
+        }
 
         if (!sidebarOpen) setSidebarOpen(true);
       });
@@ -130,8 +198,16 @@ const Globe = ({
 
         const coordinates = feature.geometry.coordinates;
         setSidebarTrigger('marker');
-        setSelectedClusterHumans([feature.properties]);
+        setSelectedClusterHumans([{
+          ...feature.properties,
+          lat: coordinates[1],
+          lng: coordinates[0],
+        }]);
         setLastMarkerCoordinates(coordinates);
+        lastMarkerCoordinatesRef.current = coordinates;
+        setSidebarMode('location');
+        sidebarModeRef.current = 'location';
+        focusedZoomRef.current = globe.getZoom();
 
         if (sidebarOpen) {
           globe.easeTo({

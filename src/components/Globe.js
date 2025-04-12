@@ -3,6 +3,8 @@ import React, { useEffect, useRef } from 'react';
 import mapboxgl from 'mapbox-gl';
 import { SIDEBAR_WIDTH } from '../constants/layout';
 import updateClusterVisualStates from '../utils/updateClusterVisualStates';
+import { isMarkerStillFocused } from '../utils/mapValidation';
+import { updateHaloForFeature } from '../utils/mapUtils';
 import useClusterExpansion from '../hooks/useClusterExpansion';
 import useSidebarMapPadding from '../hooks/useSidebarMapPadding';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -10,6 +12,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 const Globe = ({
   globeRef,
   notableHumans,
+  setSelectedListHuman,
   setSelectedClusterHumans,
   sidebarOpen,
   setSidebarOpen,
@@ -19,9 +22,10 @@ const Globe = ({
   setLastMarkerCoordinates,
   pendingClusterExpansion,
   setPendingClusterExpansion,
-  sidebarMode,
   setSidebarMode,
   focusedZoomRef, lastMarkerCoordinatesRef, sidebarModeRef,
+  setExpandedHumanId,
+  haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef
 }) => {
   const containerRef = useRef(null);
   const didFlyToCluster = useRef(false);
@@ -99,45 +103,58 @@ const Globe = ({
         },
       });
 
+      globe.addSource('halo', {
+        type: 'geojson',
+        data: {
+          type: 'FeatureCollection',
+          features: []
+        }
+      });
+
+      globe.addLayer({
+        id: 'halo-layer',
+        type: 'circle',
+        source: 'halo',
+        paint: {
+          'circle-radius': ['+', ['get', 'baseRadius'], ['get', 'pulseOffset']],
+          'circle-color': '#f28cb1',
+          'circle-opacity': 0.5
+        }
+      });
+
       globe.on('moveend', () => {
         setTimeout(() => updateClusterVisualStates(globe), 100);
 
         const currentMode = sidebarModeRef.current;
         const lastCoords = lastMarkerCoordinatesRef.current;
 
-        console.log(lastCoords, currentMode)
         if (currentMode !== 'location' || !lastCoords) return;
-        console.log("heree!")
-        const center = globe.getCenter();
-        const currentZoom = globe.getZoom();
-        const focusedZoom = focusedZoomRef.current ?? currentZoom;
 
-        const screenCenter = globe.project(center);
-        const screenTarget = globe.project(new mapboxgl.LngLat(...lastCoords));
+        const stillFocused = isMarkerStillFocused({
+          globe,
+          targetLngLat: lastCoords,
+          focusedZoom: focusedZoomRef.current ?? globe.getZoom()
+        });
 
-        const dx = screenCenter.x - screenTarget.x;
-        const dy = screenCenter.y - screenTarget.y;
-        const pixelDistance = Math.sqrt(dx * dx + dy * dy);
-
-        const hasMovedAway = pixelDistance > 30;
-
-        const zoomDiff = Math.abs(currentZoom - focusedZoom);
-        const isZoomedOut = zoomDiff > 0.1;
-
-        if (hasMovedAway || isZoomedOut) {
+        if (!stillFocused) {
           const all = notableHumans?.features?.map(f => ({
             ...f.properties,
             lat: f.geometry.coordinates[1],
             lng: f.geometry.coordinates[0],
           })) ?? [];
+
           const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
           setSelectedClusterHumans(sorted);
           setLastMarkerCoordinates(null);
           setPendingClusterExpansion(null);
           setSidebarMode('all');
-          sidebarModeRef.current = null;
           lastMarkerCoordinatesRef.current = null;
           focusedZoomRef.current = null;
+          setSelectedListHuman(null);
+          setExpandedHumanId(null);
+          cancelAnimationFrame(pulseAnimationFrameRef.current);
+          isAnimatingRef.current = false;
+          globe.getSource('halo').setData({ type: 'FeatureCollection', features: [] });
         }
       });
 
@@ -163,9 +180,9 @@ const Globe = ({
         // === ✨ Sidebar content behavior ===
         if (isFullyOverlapping) {
           setSidebarMode('location');
-          sidebarModeRef.current = 'location';
-
+          setLastMarkerCoordinates(coordinates);
           focusedZoomRef.current = globe.getZoom();
+
           globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
             if (err) return;
             const sorted = leaves.map(leaf => ({
@@ -173,20 +190,57 @@ const Globe = ({
               lat: leaf.geometry.coordinates[1],
               lng: leaf.geometry.coordinates[0],
             })).sort((a, b) => a.name.localeCompare(b.name));
-
             setSelectedClusterHumans(sorted);
-            lastMarkerCoordinatesRef.current = coordinates;
+
+            function computeMarkerRadius(pointCount) {
+              if (pointCount >= 30) return 25;
+              if (pointCount >= 10) return 20;
+              return 15;
+            }
+            const markerRadius = computeMarkerRadius(cluster.properties.point_count);
+            const haloRadius = markerRadius + 8; // or whatever glow offset you want
+            const clusterFeatureWithId = {
+              ...cluster,
+              id: cluster.properties.cluster_id, // assign Mapbox-compatible feature ID
+            };
+            updateHaloForFeature(
+              globe,
+              clusterFeatureWithId,
+              haloRadius,
+              haloPersistRef,
+              currentHaloFeatureRef,
+              pulseAnimationFrameRef,
+              isAnimatingRef
+            );
           });
         } else {
           // Not fully overlapping — show everyone from the full dataset
           setSidebarMode('all');
+          setSelectedListHuman(null);
+          setExpandedHumanId(null);
+          focusedZoomRef.current = null;
+
           const all = notableHumans?.features?.map(f => ({
             ...f.properties,
             lat: f.geometry.coordinates[1],
             lng: f.geometry.coordinates[0],
           })) ?? [];
+
           const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
           setSelectedClusterHumans(sorted);
+
+          // 🔥 Full halo cleanup
+          if (isAnimatingRef.current) {
+            cancelAnimationFrame(pulseAnimationFrameRef.current);
+            isAnimatingRef.current = false;
+          }
+
+          globe.getSource('halo').setData({
+            type: 'FeatureCollection',
+            features: [],
+          });
+
+          currentHaloFeatureRef.current = null;
         }
 
         if (!sidebarOpen) setSidebarOpen(true);
@@ -197,17 +251,33 @@ const Globe = ({
         if (!feature) return;
 
         const coordinates = feature.geometry.coordinates;
-        setSidebarTrigger('marker');
-        setSelectedClusterHumans([{
+        const human = {
           ...feature.properties,
           lat: coordinates[1],
           lng: coordinates[0],
-        }]);
+        };
+        setSelectedClusterHumans([human]);
+        setSidebarTrigger('marker');
         setLastMarkerCoordinates(coordinates);
-        lastMarkerCoordinatesRef.current = coordinates;
         setSidebarMode('location');
-        sidebarModeRef.current = 'location';
         focusedZoomRef.current = globe.getZoom();
+
+        setSelectedListHuman(human);
+        setExpandedHumanId(human.wikidata_id);
+
+        const featureWithId = {
+          ...feature,
+          id: feature.id ?? feature.properties.wikidata_id, // fallback to a unique identifier you control
+        };
+        updateHaloForFeature(
+          globe,
+          featureWithId,
+          feature.properties.markerRadius+8 || 18,
+          haloPersistRef,
+          currentHaloFeatureRef,
+          pulseAnimationFrameRef,
+          isAnimatingRef
+        );
 
         if (sidebarOpen) {
           globe.easeTo({

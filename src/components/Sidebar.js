@@ -1,9 +1,8 @@
-// Sidebar.js
-import React from 'react';
+import React, { useCallback, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { FixedSizeList as List } from 'react-window';
+import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { FaFilter, FaArrowRight, FaArrowLeft } from 'react-icons/fa';
+import { FaFilter, FaArrowRight, FaArrowLeft, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
 
 // Utility: only shows a tooltip if the text is visually truncated
@@ -36,48 +35,128 @@ const OverflowTooltip = ({ children, tooltipText }) => {
   );
 };
 
+
 /**
  * Sidebar slide-out panel to show people at a selected marker/cluster.
  */
 const Sidebar = ({
-  sidebarOpen,
-  setSidebarOpen,
-  sidebarTrigger,
-  setSidebarTrigger,
-  humansAtMarker,
-  lastMarkerCoordinates,
-  pendingClusterExpansion,
-  setPendingClusterExpansion,
-  sidebarMode,
-  onSelectPerson
+    sidebarOpen,
+    setSidebarOpen,
+    setSidebarTrigger,
+    humansAtMarker,
+    sidebarMode,
+    onSelectPerson,
+    selectedListHuman,
+    setSelectedListHuman,
+    expandedHumanId, setExpandedHumanId
 }) => {
-  // === Render one row in the scrollable list ===
-  const renderHumanRow = ({ index, style }) => {
-    const human = humansAtMarker[index];
-    return (
-      <div
-        key={human.wikidata_id}
-        onClick={() => onSelectPerson?.(human)}
-        style={{
+
+    const getItemSize = (index) => {
+      const human = humansAtMarker[index];
+      const isExpanded = expandedHumanId === human.wikidata_id;
+      return isExpanded ? 140 : 40; // Adjust height as needed
+    };
+
+    const listRef = React.useRef(null);
+
+    useEffect(() => {
+      if (!listRef.current) return;
+      listRef.current.resetAfterIndex(0, true); // Recalculates heights
+    }, [expandedHumanId, humansAtMarker]);
+
+    // 👇 Scroll the expanded row into view
+    React.useEffect(() => {
+        if (!listRef.current || !expandedHumanId) return;
+
+        const index = humansAtMarker.findIndex(
+          (h) => h.wikidata_id === expandedHumanId
+        );
+
+        if (index !== -1) {
+          listRef.current.scrollToItem(index, 'smart');
+        }
+    }, [expandedHumanId, humansAtMarker]);
+
+    const handleRowClick = (human) => {
+        const alreadyFocused =
+        sidebarMode === 'location' &&
+        selectedListHuman?.wikidata_id === human.wikidata_id;
+
+        if (alreadyFocused) {
+            // Just expand the info — skip the flyTo
+            setExpandedHumanId(human.wikidata_id);
+            return;
+        }
+
+        // Otherwise, trigger flyTo + highlight
+        setSelectedListHuman(human);
+        setExpandedHumanId(human.wikidata_id);
+        onSelectPerson?.(human); // <-- still triggers map behavior
+    };
+
+    // === Render one row in the scrollable list ===
+    const renderHumanRow = useCallback(({ index, style }) => {
+      const human = humansAtMarker[index];
+      const isSelected = selectedListHuman?.wikidata_id === human.wikidata_id;
+      const isExpanded = expandedHumanId === human.wikidata_id;
+
+      return (
+        <div
+          key={human.wikidata_id}
+          style={{
             ...style,
-            display: 'flex',
-            alignItems: 'center',
-            borderBottom: '1px solid #ddd',
             padding: '0 10px',
-            fontSize: 14,
-            fontWeight: 500,
-            cursor: 'pointer',
-            width: '100%',
-            overflow: 'hidden',
-            boxSizing: 'border-box'
-        }}
-      >
-        <OverflowTooltip tooltipText={human.name}>
-          {human.name} {human.birth_year ? `(${human.birth_year})` : ''}
-        </OverflowTooltip>
-      </div>
-    );
-  };
+            display: 'flex',
+            flexDirection: 'column',
+            borderBottom: '1px solid #ddd',
+            boxSizing: 'border-box',
+            backgroundColor: isSelected ? 'rgba(242, 140, 177, 0.25)' : undefined,
+          }}
+        >
+          {/* Name row */}
+          <div
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              fontSize: 14,
+              fontWeight: 500,
+            }}
+          >
+            <div
+              onClick={() => handleRowClick(human)}
+              style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer', }}
+            >
+              <OverflowTooltip tooltipText={human.name}>
+                {human.name} {human.birth_year ? `(${human.birth_year})` : ''}
+              </OverflowTooltip>
+            </div>
+
+            {/* Expand/collapse icon */}
+            <div
+              onClick={(e) => {
+                e.stopPropagation(); // prevent flying to marker
+                setExpandedHumanId(isExpanded ? null : human.wikidata_id);
+              }}
+              style={{ marginLeft: 8, cursor: 'pointer' }}
+            >
+              {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
+            </div>
+          </div>
+
+            {isExpanded && (
+              <div style={{ fontSize: 13, padding: '6px 0 10px', color: '#444' }}>
+                <div><strong>Wikidata ID:</strong> {human.wikidata_id}</div>
+                <div><strong>Views:</strong> {human.article_recent_views?.toLocaleString() ?? 'N/A'}</div>
+                <div><strong>Edits:</strong> {human.article_total_edits ?? 'N/A'}</div>
+                <div><strong>Birthplace:</strong> {human.birth_place?.name ?? 'Unknown'}</div>
+              </div>
+            )}
+
+
+        </div>
+      );
+    }, [humansAtMarker, onSelectPerson, selectedListHuman, expandedHumanId, setExpandedHumanId]);
+
 
   return (
     <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', pointerEvents: 'none' }}>
@@ -86,9 +165,6 @@ const Sidebar = ({
         initial={false}
         animate={{ x: sidebarOpen ? 0 : -SIDEBAR_WIDTH }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
-        onAnimationComplete={() => {
-          if (!sidebarOpen) setSidebarTrigger(null); // Reset trigger after closing
-        }}
         style={{
           width: SIDEBAR_WIDTH,
           height: '100%',
@@ -117,9 +193,10 @@ const Sidebar = ({
               {({ height, width }) => (
                 <div className="sidebar-list-container" style={{ width: width, overflowX: 'hidden' }}>
                     <List
+                      ref={listRef}
                       height={height}
                       itemCount={humansAtMarker.length}
-                      itemSize={40}
+                      itemSize={getItemSize} // <-- dynamic sizing!
                       width={width}
                     >
                       {renderHumanRow}

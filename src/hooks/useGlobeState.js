@@ -1,26 +1,29 @@
 import { useState, useRef } from 'react';
+import useSyncedStateWithRef from './useSyncedStateWithRef';
 
 const useGlobeState = () => {
-  const globeRef = useRef(null); // Reference to the Mapbox instance
+  const globeRef = useRef(null); // Mapbox instance
+  const [notableHumans, setNotableHumans] = useState(null);
+  const [error, setError] = useState(null);
 
-  const [notableHumans, setNotableHumans] = useState(null); // GeoJSON data
-  const [error, setError] = useState(null); // Error fetching data
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarTrigger, setSidebarTrigger] = useState(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false); // Sidebar visibility
-  const [sidebarTrigger, setSidebarTrigger] = useState(null); // What triggered the sidebar
-  const [sidebarMode, setSidebarMode] = useState('all'); // 'all' | 'location'
-  const sidebarModeRef = useRef(null);
+  // ✅ Use synced state/ref pairs
+  const [sidebarMode, setSidebarMode, sidebarModeRef] = useSyncedStateWithRef('all');
+  const [lastMarkerCoordinates, setLastMarkerCoordinates, lastMarkerCoordinatesRef] = useSyncedStateWithRef(null);
 
-  const [selectedClusterHumans, setSelectedClusterHumans] = useState([]); // Data shown in sidebar
-  const [lastMarkerCoordinates, setLastMarkerCoordinates] = useState(null); // Last marker/cluster clicked
-  const lastMarkerCoordinatesRef = useRef(null);
-
+  const [selectedClusterHumans, setSelectedClusterHumans] = useState([]);
+  const [selectedListHuman, setSelectedListHuman] = useState(null);
   const [pendingClusterExpansion, setPendingClusterExpansion] = useState(null);
-  // { clusterId, coordinates, isFullyOverlapping }
-
   const focusedZoomRef = useRef(null);
 
+  const [expandedHumanId, setExpandedHumanId] = useState(null);
 
+  const haloPersistRef = useRef(null); // last halo data
+  const currentHaloFeatureRef = useRef(null); // current feature pulsing
+  const pulseAnimationFrameRef = useRef(null); // for canceling animation
+  const isAnimatingRef = useRef(false); // control loop
 
   return {
     globeRef,
@@ -28,11 +31,17 @@ const useGlobeState = () => {
     error, setError,
     sidebarOpen, setSidebarOpen,
     sidebarTrigger, setSidebarTrigger,
-    sidebarMode, setSidebarMode,
+
+    // Synced state+ref pairs
+    sidebarMode, setSidebarMode, sidebarModeRef,
+    lastMarkerCoordinates, setLastMarkerCoordinates, lastMarkerCoordinatesRef,
+
     selectedClusterHumans, setSelectedClusterHumans,
-    lastMarkerCoordinates, setLastMarkerCoordinates,
+    selectedListHuman,setSelectedListHuman,
     pendingClusterExpansion, setPendingClusterExpansion,
-    focusedZoomRef, lastMarkerCoordinatesRef, sidebarModeRef,
+    focusedZoomRef,
+    expandedHumanId, setExpandedHumanId,
+    haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef
   };
 };
 

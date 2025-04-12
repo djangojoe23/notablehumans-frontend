@@ -6,21 +6,25 @@ import Globe from './components/Globe';
 import useGlobeState from './hooks/useGlobeState';
 import throttle from 'lodash.throttle';
 import updateClusterVisualStates from './utils/updateClusterVisualStates';
+import { isMarkerStillFocused } from './utils/mapValidation'; // adjust path as needed
 import './App.css';
 
 function App() {
   const {
-    globeRef,
-    notableHumans, setNotableHumans,
-    error, setError,
-    sidebarOpen, setSidebarOpen,
-    sidebarTrigger, setSidebarTrigger,
-    sidebarMode, setSidebarMode,
-    selectedClusterHumans, setSelectedClusterHumans,
-    lastMarkerCoordinates, setLastMarkerCoordinates,
-    pendingClusterExpansion, setPendingClusterExpansion,
-    focusedZoomRef, lastMarkerCoordinatesRef,
-    sidebarModeRef,
+      globeRef,
+      notableHumans, setNotableHumans,
+      error, setError,
+      sidebarOpen, setSidebarOpen,
+      sidebarTrigger, setSidebarTrigger,
+      sidebarMode, setSidebarMode,
+      selectedListHuman, setSelectedListHuman,
+      selectedClusterHumans, setSelectedClusterHumans,
+      lastMarkerCoordinates, setLastMarkerCoordinates,
+      pendingClusterExpansion, setPendingClusterExpansion,
+      focusedZoomRef, lastMarkerCoordinatesRef,
+      sidebarModeRef,
+      expandedHumanId, setExpandedHumanId,
+      haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef
   } = useGlobeState();
 
   useEffect(() => {
@@ -55,21 +59,41 @@ function App() {
     const globe = globeRef.current;
     const targetLngLat = [parseFloat(human.lng), parseFloat(human.lat)];
     const maxZoom = 16;
+
+    // 💡 Exit early if already focused and in "location" mode
+   const alreadyFocused =
+    sidebarModeRef.current === 'location' &&
+    selectedClusterHumans.some(h => h.wikidata_id === human.wikidata_id) &&
+    isMarkerStillFocused({
+      globe,
+      targetLngLat,
+      focusedZoom: focusedZoomRef.current,
+      tolerance: 30,
+      zoomThreshold: 0.1,
+    });
+
+    if (alreadyFocused) {
+      setSelectedListHuman(human);         // highlight immediately
+      setExpandedHumanId(human.wikidata_id); // expand info
+      return;
+    }
+
+    setSelectedListHuman(human); // fallback case: update normally
+
     let animationStopped = false;
 
-    // Throttled version of updateClusterVisualStates (every 150ms)
     const throttledUpdate = throttle(() => {
       updateClusterVisualStates(globe);
     }, 150);
 
     const stopAndSelect = (humansAtPoint) => {
       setSelectedClusterHumans(humansAtPoint);
+
+      const matched = humansAtPoint.find(h => h.wikidata_id === human.wikidata_id);
+      setSelectedListHuman(matched ?? null);
+
       setLastMarkerCoordinates(targetLngLat);
-      lastMarkerCoordinatesRef.current = targetLngLat;
-
       setSidebarMode('location');
-      sidebarModeRef.current = 'location';
-
       setSidebarTrigger('marker');
       focusedZoomRef.current = globe.getZoom();
 
@@ -83,10 +107,9 @@ function App() {
 
       const point = globe.project(targetLngLat);
       const features = globe.queryRenderedFeatures(point, {
-        layers: ['clusters', 'unclustered-point']
+        layers: ['clusters', 'unclustered-point'],
       });
 
-      // Check for unclustered point
       const unclustered = features.find(f =>
         f.layer.id === 'unclustered-point' &&
         f.properties.wikidata_id === human.wikidata_id
@@ -97,7 +120,6 @@ function App() {
         return;
       }
 
-      // Check for fully overlapping cluster
       const cluster = features.find(f => f.layer.id === 'clusters');
       if (cluster && !animationStopped) {
         const clusterId = cluster.properties.cluster_id;
@@ -117,7 +139,6 @@ function App() {
       }
     };
 
-    // 👇 Start flying to the target at full zoom
     globe.flyTo({
       center: targetLngLat,
       zoom: maxZoom,
@@ -126,12 +147,12 @@ function App() {
       easing: t => t,
     });
 
-    // 👀 Begin checking mid-flight
     globe.on('move', checkWhileFlying);
     globe.once('moveend', () => {
       globe.off('move', checkWhileFlying);
     });
   };
+
 
   return (
     <div className="app-container">
@@ -140,6 +161,7 @@ function App() {
         <Globe
             globeRef={globeRef}
             notableHumans={notableHumans}
+            setSelectedListHuman={setSelectedListHuman}
             setSelectedClusterHumans={setSelectedClusterHumans}
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
@@ -149,23 +171,27 @@ function App() {
             setLastMarkerCoordinates={setLastMarkerCoordinates}
             pendingClusterExpansion={pendingClusterExpansion}
             setPendingClusterExpansion={setPendingClusterExpansion}
-            sidebarMode={sidebarMode}
             setSidebarMode={setSidebarMode}
             focusedZoomRef={focusedZoomRef}
             lastMarkerCoordinatesRef={lastMarkerCoordinatesRef}
             sidebarModeRef={sidebarModeRef}
+            setExpandedHumanId={setExpandedHumanId}
+            haloPersistRef={haloPersistRef}
+            currentHaloFeatureRef={currentHaloFeatureRef}
+            pulseAnimationFrameRef={pulseAnimationFrameRef}
+            isAnimatingRef={isAnimatingRef}
         />
         <Sidebar
             sidebarOpen={sidebarOpen}
             setSidebarOpen={setSidebarOpen}
-            sidebarTrigger={sidebarTrigger}
             setSidebarTrigger={setSidebarTrigger}
             humansAtMarker={selectedClusterHumans}
-            lastMarkerCoordinates={lastMarkerCoordinates}
-            pendingClusterExpansion={pendingClusterExpansion}
-            setPendingClusterExpansion={setPendingClusterExpansion}
             sidebarMode={sidebarMode}
             onSelectPerson={handleSelectPerson}
+            selectedListHuman={selectedListHuman}
+            setSelectedListHuman={setSelectedListHuman}
+            expandedHumanId={expandedHumanId}
+            setExpandedHumanId={setExpandedHumanId}
         />
       </div>
     </div>

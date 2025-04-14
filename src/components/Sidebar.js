@@ -4,6 +4,8 @@ import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { FaFilter, FaArrowRight, FaArrowLeft, FaChevronDown, FaChevronRight } from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
+import HumanDetail from './HumanDetail'; // adjust path as needed
+
 
 // Utility: only shows a tooltip if the text is visually truncated
 const OverflowTooltip = ({ children, tooltipText }) => {
@@ -53,7 +55,7 @@ const Sidebar = ({
 
     const getItemSize = (index) => {
       const human = humansAtMarker[index];
-      const isExpanded = expandedHumanId === human.wikidata_id;
+      const isExpanded = expandedHumanId === human.id;
       return isExpanded ? 140 : 40; // Adjust height as needed
     };
 
@@ -69,7 +71,7 @@ const Sidebar = ({
         if (!listRef.current || !expandedHumanId) return;
 
         const index = humansAtMarker.findIndex(
-          (h) => h.wikidata_id === expandedHumanId
+          (h) => h.id === expandedHumanId
         );
 
         if (index !== -1) {
@@ -80,29 +82,29 @@ const Sidebar = ({
     const handleRowClick = (human) => {
         const alreadyFocused =
         sidebarMode === 'location' &&
-        selectedListHuman?.wikidata_id === human.wikidata_id;
+        selectedListHuman?.id === human.id;
 
         if (alreadyFocused) {
             // Just expand the info — skip the flyTo
-            setExpandedHumanId(human.wikidata_id);
+            setExpandedHumanId(human.id);
             return;
         }
 
         // Otherwise, trigger flyTo + highlight
         setSelectedListHuman(human);
-        setExpandedHumanId(human.wikidata_id);
+        setExpandedHumanId(human.id);
         onSelectPerson?.(human); // <-- still triggers map behavior
     };
 
     // === Render one row in the scrollable list ===
     const renderHumanRow = useCallback(({ index, style }) => {
       const human = humansAtMarker[index];
-      const isSelected = selectedListHuman?.wikidata_id === human.wikidata_id;
-      const isExpanded = expandedHumanId === human.wikidata_id;
+      const isSelected = selectedListHuman?.id === human.id;
+      const isExpanded = expandedHumanId === human.id;
 
       return (
         <div
-          key={human.wikidata_id}
+          key={human.id}
           style={{
             ...style,
             padding: '0 10px',
@@ -126,8 +128,8 @@ const Sidebar = ({
               onClick={() => handleRowClick(human)}
               style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer', }}
             >
-              <OverflowTooltip tooltipText={human.name}>
-                {human.name} {human.birth_year ? `(${human.birth_year})` : ''}
+              <OverflowTooltip tooltipText={human.n}>
+                {human.n} {human.by? `(${human.by})` : ''}
               </OverflowTooltip>
             </div>
 
@@ -135,7 +137,7 @@ const Sidebar = ({
             <div
               onClick={(e) => {
                 e.stopPropagation(); // prevent flying to marker
-                setExpandedHumanId(isExpanded ? null : human.wikidata_id);
+                setExpandedHumanId(isExpanded ? null : human.id);
               }}
               style={{ marginLeft: 8, cursor: 'pointer' }}
             >
@@ -144,11 +146,15 @@ const Sidebar = ({
           </div>
 
             {isExpanded && (
-              <div style={{ fontSize: 13, padding: '6px 0 10px', color: '#444' }}>
-                <div><strong>Wikidata ID:</strong> {human.wikidata_id}</div>
-                <div><strong>Views:</strong> {human.article_recent_views?.toLocaleString() ?? 'N/A'}</div>
-                <div><strong>Edits:</strong> {human.article_total_edits ?? 'N/A'}</div>
-                <div><strong>Birthplace:</strong> {human.birth_place?.name ?? 'Unknown'}</div>
+              <div
+                style={{
+                  padding: '8px 10px',
+                  background: '#fff',
+                  borderRadius: 4,
+                  boxShadow: '0 0 4px rgba(0,0,0,0.1)',
+                }}
+              >
+                <HumanDetail person={human} />
               </div>
             )}
 

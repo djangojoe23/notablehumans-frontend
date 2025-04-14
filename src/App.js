@@ -8,6 +8,7 @@ import throttle from 'lodash.throttle';
 import updateClusterVisualStates from './utils/updateClusterVisualStates';
 import { isMarkerStillFocused } from './utils/mapValidation'; // adjust path as needed
 import './App.css';
+import {updateHaloForFeature} from "./utils/mapUtils";
 
 function App() {
   const {
@@ -63,7 +64,7 @@ function App() {
     // 💡 Exit early if already focused and in "location" mode
    const alreadyFocused =
     sidebarModeRef.current === 'location' &&
-    selectedClusterHumans.some(h => h.wikidata_id === human.wikidata_id) &&
+    selectedClusterHumans.some(h => h.id === human.id) &&
     isMarkerStillFocused({
       globe,
       targetLngLat,
@@ -74,7 +75,7 @@ function App() {
 
     if (alreadyFocused) {
       setSelectedListHuman(human);         // highlight immediately
-      setExpandedHumanId(human.wikidata_id); // expand info
+      setExpandedHumanId(human.id); // expand info
       return;
     }
 
@@ -86,10 +87,10 @@ function App() {
       updateClusterVisualStates(globe);
     }, 150);
 
-    const stopAndSelect = (humansAtPoint) => {
+    const stopAndSelect = (humansAtPoint, featureForHalo = null, markerRadius = 10) => {
       setSelectedClusterHumans(humansAtPoint);
 
-      const matched = humansAtPoint.find(h => h.wikidata_id === human.wikidata_id);
+      const matched = humansAtPoint.find(h => h.id === human.id);
       setSelectedListHuman(matched ?? null);
 
       setLastMarkerCoordinates(targetLngLat);
@@ -100,6 +101,22 @@ function App() {
       globe.stop();
       animationStopped = true;
       globe.off('move', checkWhileFlying);
+
+      // 🌟 Add pulsing halo if valid feature provided
+      if (featureForHalo) {
+        updateHaloForFeature(
+          globe,
+          {
+            ...featureForHalo,
+            id: featureForHalo.id ?? featureForHalo.properties?.id ?? human.id
+          },
+          markerRadius + 8,
+          haloPersistRef,
+          currentHaloFeatureRef,
+          pulseAnimationFrameRef,
+          isAnimatingRef
+        );
+      }
     };
 
     const checkWhileFlying = () => {
@@ -112,11 +129,20 @@ function App() {
 
       const unclustered = features.find(f =>
         f.layer.id === 'unclustered-point' &&
-        f.properties.wikidata_id === human.wikidata_id
+        f.properties.id === human.id
       );
 
       if (unclustered && !animationStopped) {
-        stopAndSelect([human]);
+        const coords = unclustered.geometry?.coordinates ?? targetLngLat;
+        stopAndSelect(
+            [human],
+            {
+              ...unclustered,
+              geometry: { coordinates: coords }, // 💡 Add fallback manually
+              id: unclustered.id ?? unclustered.properties.id,
+            },
+            10
+        );
         return;
       }
 
@@ -126,16 +152,37 @@ function App() {
         const isFullyOverlapping = globe.getFeatureState({ source: 'humans', id: clusterId })?.fullyOverlapping;
 
         if (isFullyOverlapping) {
-          globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
+            globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
             if (err) return;
-            const sorted = leaves.map(l => ({
-              ...l.properties,
-              lat: l.geometry.coordinates[1],
-              lng: l.geometry.coordinates[0],
-            })).sort((a, b) => a.name.localeCompare(b.name));
-            stopAndSelect(sorted);
-          });
-        }
+
+            const sorted = leaves
+              .filter(l => l.geometry?.coordinates?.length === 2)
+              .map(l => ({
+                ...l.properties,
+                lat: l.geometry.coordinates[1],
+                lng: l.geometry.coordinates[0],
+              }))
+              .sort((a, b) => a.n.localeCompare(b.n));
+
+            function computeMarkerRadius(pointCount) {
+              if (pointCount >= 30) return 25;
+              if (pointCount >= 10) return 20;
+              return 15;
+            }
+
+            const coords = cluster.geometry?.coordinates ?? targetLngLat;
+
+            stopAndSelect(
+              sorted,
+              {
+                ...cluster,
+                geometry: { coordinates: coords },
+                id: clusterId,
+              },
+              computeMarkerRadius(cluster.properties.point_count)
+            );
+            });
+            }
       }
     };
 

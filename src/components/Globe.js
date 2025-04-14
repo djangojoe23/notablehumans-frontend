@@ -143,7 +143,7 @@ const Globe = ({
             lng: f.geometry.coordinates[0],
           })) ?? [];
 
-          const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
+          const sorted = all.sort((a, b) => a.n.localeCompare(b.n));
           setSelectedClusterHumans(sorted);
           setLastMarkerCoordinates(null);
           setPendingClusterExpansion(null);
@@ -189,7 +189,7 @@ const Globe = ({
               ...leaf.properties,
               lat: leaf.geometry.coordinates[1],
               lng: leaf.geometry.coordinates[0],
-            })).sort((a, b) => a.name.localeCompare(b.name));
+            })).sort((a, b) => a.n.localeCompare(b.n));
             setSelectedClusterHumans(sorted);
 
             function computeMarkerRadius(pointCount) {
@@ -226,7 +226,7 @@ const Globe = ({
             lng: f.geometry.coordinates[0],
           })) ?? [];
 
-          const sorted = all.sort((a, b) => a.name.localeCompare(b.name));
+          const sorted = all.sort((a, b) => a.n.localeCompare(b.n));
           setSelectedClusterHumans(sorted);
 
           // 🔥 Full halo cleanup
@@ -263,11 +263,11 @@ const Globe = ({
         focusedZoomRef.current = globe.getZoom();
 
         setSelectedListHuman(human);
-        setExpandedHumanId(human.wikidata_id);
+        setExpandedHumanId(human.id);
 
         const featureWithId = {
           ...feature,
-          id: feature.id ?? feature.properties.wikidata_id, // fallback to a unique identifier you control
+          id: feature.id ?? feature.properties.id, // fallback to a unique identifier you control
         };
         updateHaloForFeature(
           globe,

@@ -1,273 +1,260 @@
-import React, { useCallback, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, {useEffect, useMemo, useRef} from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { FaFilter, FaArrowRight, FaArrowLeft, FaChevronDown, FaChevronRight } from 'react-icons/fa';
+import { FaFilter, FaArrowRight, FaArrowLeft, FaTimes, FaInfo } from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
-import HumanDetail from './HumanDetail'; // adjust path as needed
+import { sortHumansComparator } from '../utils/sortHumans';
+import {formatYear} from "../utils/format";
+import OverflowTooltip from "./OverflowTooltip"
+import HumanDetail from './HumanDetail';
 
 
-// Utility: only shows a tooltip if the text is visually truncated
-const OverflowTooltip = ({ children, tooltipText }) => {
-  const textRef = React.useRef(null);
-  const [isTruncated, setIsTruncated] = React.useState(false);
+const Sidebar = (globeState) => {
+    const listRef = useRef(null);
 
-  React.useEffect(() => {
-    const el = textRef.current;
-    if (el) {
-      setIsTruncated(el.scrollWidth > el.clientWidth);
-    }
-  }, [children]);
+    const sortedHumans = useMemo(() => {
+      const features = globeState.notableHumanData?.features ?? [];
+      const humans = features.map((f) => ({
+          ...f.properties,
+          lat: f.geometry.coordinates[1],
+          lng: f.geometry.coordinates[0]
+      }));
+      return humans.sort(sortHumansComparator('n', true));
+    }, [globeState.notableHumanData]);
 
-  return (
-    <div
-      ref={textRef}
-      title={isTruncated ? tooltipText : ''}
-      style={{
-        whiteSpace: 'nowrap',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        maxWidth: '100%',
-        display: 'block',
-        // cursor: 'default',
-      }}
-    >
-      {children}
-    </div>
-  );
-};
-
-
-/**
- * Sidebar slide-out panel to show people at a selected marker/cluster.
- */
-const Sidebar = ({
-    sidebarOpen,
-    setSidebarOpen,
-    setSidebarTrigger,
-    humansAtMarker,
-    sidebarMode,
-    onSelectPerson,
-    selectedListHuman,
-    setSelectedListHuman,
-    expandedHumanId, setExpandedHumanId
-}) => {
-
-    const getItemSize = (index) => {
-      const human = humansAtMarker[index];
-      const isExpanded = expandedHumanId === human.id;
-      return isExpanded ? 140 : 40; // Adjust height as needed
-    };
-
-    const listRef = React.useRef(null);
-
-    useEffect(() => {
-      if (!listRef.current) return;
-      listRef.current.resetAfterIndex(0, true); // Recalculates heights
-    }, [expandedHumanId, humansAtMarker]);
-
-    // 👇 Scroll the expanded row into view
-    React.useEffect(() => {
-        if (!listRef.current || !expandedHumanId) return;
-
-        const index = humansAtMarker.findIndex(
-          (h) => h.id === expandedHumanId
-        );
-
-        if (index !== -1) {
-          listRef.current.scrollToItem(index, 'smart');
-        }
-    }, [expandedHumanId, humansAtMarker]);
+    const getItemSize = () => 36; // fixed row height for now
 
     const handleRowClick = (human) => {
-        const alreadyFocused =
-        sidebarMode === 'location' &&
-        selectedListHuman?.id === human.id;
+        const globe = globeState.globeRef.current;
+        if (!globe) return;
 
-        if (alreadyFocused) {
-            // Just expand the info — skip the flyTo
-            setExpandedHumanId(human.id);
-            return;
-        }
+        // 1. Keep current zoom, pan to the human’s coords
+        const currentZoom = globe.getZoom();
+        globe.flyTo({
+            center: [human.lng, human.lat],
+            zoom: currentZoom,       // lock zoom
+            essential: true,         // animation
+        });
 
-        // Otherwise, trigger flyTo + highlight
-        setSelectedListHuman(human);
-        setExpandedHumanId(human.id);
-        onSelectPerson?.(human); // <-- still triggers map behavior
+        // 2. Remember who’s selected
+        globeState.setDetailedHuman(human);
     };
 
-    // === Render one row in the scrollable list ===
-    const renderHumanRow = useCallback(({ index, style }) => {
-      const human = humansAtMarker[index];
-      const isSelected = selectedListHuman?.id === human.id;
-      const isExpanded = expandedHumanId === human.id;
-
-      return (
-        <div
-          key={human.id}
-          style={{
-            ...style,
-            padding: '0 10px',
-            display: 'flex',
-            flexDirection: 'column',
-            borderBottom: '1px solid #ddd',
-            boxSizing: 'border-box',
-            backgroundColor: isSelected ? 'rgba(242, 140, 177, 0.25)' : undefined,
-          }}
-        >
-          {/* Name row */}
+    const renderRow = ({ index, style }) => {
+        const human = sortedHumans[index];
+        return (
           <div
+            key={human.id}
+            className="sidebar-row"
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              fontSize: 14,
-              fontWeight: 500,
+                ...style,
+                padding: '0 10px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                borderBottom: '1px solid #ddd',
+                boxSizing: 'border-box',
+                fontSize: '14px',
+                cursor: 'pointer',
             }}
+            onClick={() => handleRowClick(human)}
           >
             <div
-              onClick={() => handleRowClick(human)}
-              style={{ flex: 1, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis', cursor: 'pointer', }}
-            >
-              <OverflowTooltip tooltipText={human.n}>
-                {human.n} {human.by? `(${human.by})` : ''}
-              </OverflowTooltip>
-            </div>
-
-            {/* Expand/collapse icon */}
-            <div
-              onClick={(e) => {
-                e.stopPropagation(); // prevent flying to marker
-                setExpandedHumanId(isExpanded ? null : human.id);
-              }}
-              style={{ marginLeft: 8, cursor: 'pointer' }}
-            >
-              {isExpanded ? <FaChevronDown /> : <FaChevronRight />}
-            </div>
-          </div>
-
-            {isExpanded && (
-              <div
                 style={{
-                  padding: '8px 10px',
-                  background: '#fff',
-                  borderRadius: 4,
-                  boxShadow: '0 0 4px rgba(0,0,0,0.1)',
+                  flex: 1,
+                  overflow: 'hidden',
+                  whiteSpace: 'nowrap',
+                  textOverflow: 'ellipsis',
                 }}
-              >
-                <HumanDetail person={human} />
-              </div>
+            >
+                <OverflowTooltip tooltipText={`${human.n}${human.by != null ? ` (${formatYear(human.by)})` : ''}`}>
+                  {human.n} {human.by != null ? `(${formatYear(human.by)})` : ''}
+                </OverflowTooltip>
+            </div>
+
+            {human.id === globeState.detailedHuman?.id && (
+                <FaInfo
+                  className="text-blue-500 ml-2"
+                  title="Currently expanded"
+                />
             )}
+          </div>
+        );
+    };
+
+    useEffect(() => {
+      const detailed = globeState.detailedHuman;
+      const open     = globeState.sidebarOpen;
+      if (!detailed || !open || !listRef.current) return;
+
+      const index = sortedHumans.findIndex(h => h.id === detailed.id);
+      if (index !== -1) {
+        // match your panel‑open animation duration (0.3s)
+        setTimeout(() => {
+          listRef.current.scrollToItem(index, 'end');
+        }, 300);
+      }
+    }, [globeState.detailedHuman, globeState.sidebarOpen, sortedHumans]);
 
 
-        </div>
-      );
-    }, [humansAtMarker, onSelectPerson, selectedListHuman, expandedHumanId, setExpandedHumanId]);
+    const scrollToPerson = (person) => {
+      const index = sortedHumans.findIndex(h => h.id === person.id);
+      if (index !== -1 && listRef.current) {
+        // new: always pin to the bottom
+        listRef.current.scrollToItem(index, 'end');
+      }
+    };
 
+    const flyToMarker = ({ lng, lat }) => {
+      const globe = globeState.globeRef.current;
+      if (!globe) return;
+      const currentZoom = globe.getZoom();
+      globe.flyTo({ center: [lng, lat], zoom: currentZoom });
+    };
 
-  return (
-    <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', pointerEvents: 'none' }}>
-      {/* Slide-in sidebar panel */}
-      <motion.div
-        initial={false}
-        animate={{ x: sidebarOpen ? 0 : -SIDEBAR_WIDTH }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        style={{
-          width: SIDEBAR_WIDTH,
-          height: '100%',
-          background: '#f4f4f4',
-          display: 'flex',
-          flexDirection: 'column',
-          boxShadow: '2px 0 8px rgba(0,0,0,0.2)',
-          overflow: 'hidden',
-          boxSizing: 'border-box',
-          zIndex: 10,
-          position: 'absolute',
-          pointerEvents: 'auto',
-        }}
-      >
-        {/* Header */}
-        <div style={{ marginTop: BUTTON_SIZE + 10, padding: 10 }}>
-            <h3>
-              {sidebarMode === 'all' ? 'All Notable Humans' : 'People at This Location'}
-            </h3>
-        </div>
-
-        {/* List container */}
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflowX: 'hidden', }}>
-          {humansAtMarker.length > 0 ? (
-            <AutoSizer>
-              {({ height, width }) => (
-                <div className="sidebar-list-container" style={{ width: width, overflowX: 'hidden' }}>
-                    <List
-                      ref={listRef}
-                      height={height}
-                      itemCount={humansAtMarker.length}
-                      itemSize={getItemSize} // <-- dynamic sizing!
-                      width={width}
-                    >
-                      {renderHumanRow}
-                    </List>
-                </div>
-              )}
-            </AutoSizer>
-          ) : (
-            <p style={{ padding: '10px', color: '#666' }}>
-              Click a marker to view people born there.
-            </p>
-          )}
-        </div>
-      </motion.div>
-
-      {/* Sidebar toggle button */}
-      <motion.button
-        onClick={() => {
-          setSidebarTrigger('button');
-          setSidebarOpen(!sidebarOpen);
-        }}
-        animate={{ x: sidebarOpen ? SIDEBAR_WIDTH + 10 : 10 }}
-        transition={{ duration: 0.3, ease: 'easeInOut' }}
-        style={{
-          position: 'absolute',
-          top: 10,
-          zIndex: 20,
-          width: BUTTON_SIZE,
-          height: BUTTON_SIZE,
-          borderRadius: '50%',
-          border: '2px solid #fff',
-          background: '#11b4da',
-          color: '#fff',
-          cursor: 'pointer',
-          padding: 0,
-          pointerEvents: 'auto',
-        }}
-      >
-        <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-          {/* Filter icon in center */}
-          <FaFilter
-            size={28}
-            style={{
-              position: 'absolute',
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-            }}
-          />
-          {/* Directional arrow depending on open/closed */}
+    return (
+        <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', pointerEvents: 'none' }}>
           <motion.div
-            animate={{ left: sidebarOpen ? 5 : BUTTON_SIZE - ARROW_SIZE - 8 }}
+            initial={false}
+            animate={{ x: globeState.sidebarOpen ? 0 : -SIDEBAR_WIDTH }}
+            transition={{ duration: 0.3, ease: 'easeInOut' }}
+            style={{
+              width: SIDEBAR_WIDTH,
+              height: '100%',
+              background: '#f4f4f4',
+              display: 'flex',
+              flexDirection: 'column',
+              boxShadow: '2px 0 8px rgba(0,0,0,0.2)',
+              overflow: 'hidden',
+              boxSizing: 'border-box',
+              zIndex: 10,
+              position: 'absolute',
+              pointerEvents: 'auto',
+            }}
+          >
+            {/* Header */}
+            <div style={{ marginTop: 0, padding: 10 }}>
+              <h3 style={{ margin: 0 }}>
+                All Notable Humans ({sortedHumans.length})
+              </h3>
+            </div>
+
+            <div
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                flex: 1,
+                minHeight: 0,
+              }}
+            >
+                {/* Scrollable list using react-window */}
+                <div style={{ flex: 1, minHeight: 0 }}>
+                  <AutoSizer>
+                    {({ height, width }) => (
+                      <List
+                        ref={listRef}
+                        height={height}
+                        itemCount={sortedHumans.length}
+                        itemSize={getItemSize}
+                        width={width}
+                      >
+                        {renderRow}
+                      </List>
+                    )}
+                  </AutoSizer>
+                </div>
+
+                {/* Expanding detail view */}
+                <AnimatePresence>
+                  {globeState.detailedHuman && (
+                    <motion.div
+                      key={globeState.detailedHuman.id}
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.3 }}
+                      style={{
+                        overflow: 'hidden',
+                        background: '#fff',
+                        borderTop: '1px solid #ccc',
+                        boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',
+                      }}
+                    >
+                      <div style={{ padding: 10, position: 'relative' }}>
+                        <button
+                          onClick={() => globeState.setDetailedHuman(null)}
+                          style={{
+                            position: 'absolute',
+                            top: 10,
+                            right: 10,
+                            background: 'transparent',
+                            border: 'none',
+                            cursor: 'pointer',
+                          }}
+                          title="Collapse detail panel"
+                        >
+                          <FaTimes />
+                        </button>
+                        <HumanDetail
+                            person={globeState.detailedHuman}
+                            scrollToPerson={scrollToPerson}
+                            onFlyTo={flyToMarker}
+                        />
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Sidebar toggle button */}
+          <motion.button
+            onClick={() => {
+              globeState.setSidebarOpen(!globeState.sidebarOpen);
+            }}
+            animate={{ x: globeState.sidebarOpen ? SIDEBAR_WIDTH - 60 : 10 }}
             transition={{ duration: 0.3, ease: 'easeInOut' }}
             style={{
               position: 'absolute',
-              top: '57%',
-              transform: 'translateY(-50%)',
+              top: 10,
+              zIndex: 20,
+              width: BUTTON_SIZE,
+              height: BUTTON_SIZE,
+              borderRadius: '50%',
+              border: '2px solid #666',
+              background: '#f28cb1',
+              color: '#666',
+              cursor: 'pointer',
+              padding: 0,
+              pointerEvents: 'auto',
             }}
           >
-            {sidebarOpen ? <FaArrowLeft size={ARROW_SIZE} /> : <FaArrowRight size={ARROW_SIZE} />}
-          </motion.div>
+            <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+              <FaFilter
+                size={28}
+                style={{
+                  position: 'absolute',
+                  top: '50%',
+                  left: '50%',
+                  transform: 'translate(-50%, -50%)',
+                }}
+              />
+              <motion.div
+                animate={{ left: globeState.sidebarOpen ? 5 : BUTTON_SIZE - ARROW_SIZE - 8 }}
+                transition={{ duration: 0.3, ease: 'easeInOut' }}
+                style={{
+                  position: 'absolute',
+                  top: '57%',
+                  transform: 'translateY(-50%)',
+                }}
+              >
+                {globeState.sidebarOpen ? <FaArrowLeft size={ARROW_SIZE} /> : <FaArrowRight size={ARROW_SIZE} />}
+              </motion.div>
+            </div>
+          </motion.button>
         </div>
-      </motion.button>
-    </div>
-  );
+    );
 };
 
 export default Sidebar;

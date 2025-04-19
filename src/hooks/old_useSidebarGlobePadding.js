@@ -1,8 +1,7 @@
-// hooks/useSidebarMapPadding.js
 import { useEffect } from 'react';
 import { SIDEBAR_WIDTH } from '../constants/layout';
 
-const useSidebarMapPadding = ({
+const useSidebarGlobePadding = ({
   globeRef,
   sidebarOpen,
   sidebarTrigger,
@@ -65,4 +64,4 @@ const useSidebarMapPadding = ({
   }, [map, sidebarOpen, sidebarTrigger, lastMarkerCoordinates, pendingClusterExpansion]);
 };
 
-export default useSidebarMapPadding;
+export default useSidebarGlobePadding;

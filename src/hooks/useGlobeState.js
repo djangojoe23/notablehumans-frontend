@@ -1,47 +1,38 @@
 import { useState, useRef } from 'react';
-import useSyncedStateWithRef from './useSyncedStateWithRef';
 
 const useGlobeState = () => {
-  const globeRef = useRef(null); // Mapbox instance
-  const [notableHumans, setNotableHumans] = useState(null);
-  const [error, setError] = useState(null);
+  const globeRef = useRef(null);
+
+  const [notableHumanData, setNotableHumanData] = useState(null);
+  const [dataLoadError, setDataLoadError] = useState(null);
 
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [sidebarTrigger, setSidebarTrigger] = useState(null);
 
-  // ✅ Use synced state/ref pairs
-  const [sidebarMode, setSidebarMode, sidebarModeRef] = useSyncedStateWithRef('all');
-  const [lastMarkerCoordinates, setLastMarkerCoordinates, lastMarkerCoordinatesRef] = useSyncedStateWithRef(null);
+  const [detailedHuman, setDetailedHuman] = useState(null);
 
-  const [selectedClusterHumans, setSelectedClusterHumans] = useState([]);
-  const [selectedListHuman, setSelectedListHuman] = useState(null);
-  const [pendingClusterExpansion, setPendingClusterExpansion] = useState(null);
-  const focusedZoomRef = useRef(null);
+  const isHaloActiveRef = useRef(false);
+  const haloAnimationFrameRef = useRef(null);
+  const haloPersistRef = useRef(null);
+  const currentHaloFeatureRef = useRef(null);
 
-  const [expandedHumanId, setExpandedHumanId] = useState(null);
+  const justClickedUnclusteredRef = useRef(null);
 
-  const haloPersistRef = useRef(null); // last halo data
-  const currentHaloFeatureRef = useRef(null); // current feature pulsing
-  const pulseAnimationFrameRef = useRef(null); // for canceling animation
-  const isAnimatingRef = useRef(false); // control loop
+
 
   return {
     globeRef,
-    notableHumans, setNotableHumans,
-    error, setError,
+
+    notableHumanData, setNotableHumanData,
+    dataLoadError, setDataLoadError,
+
     sidebarOpen, setSidebarOpen,
-    sidebarTrigger, setSidebarTrigger,
 
-    // Synced state+ref pairs
-    sidebarMode, setSidebarMode, sidebarModeRef,
-    lastMarkerCoordinates, setLastMarkerCoordinates, lastMarkerCoordinatesRef,
+    detailedHuman, setDetailedHuman,
 
-    selectedClusterHumans, setSelectedClusterHumans,
-    selectedListHuman,setSelectedListHuman,
-    pendingClusterExpansion, setPendingClusterExpansion,
-    focusedZoomRef,
-    expandedHumanId, setExpandedHumanId,
-    haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef
+    isHaloActiveRef, haloAnimationFrameRef, haloPersistRef, currentHaloFeatureRef,
+
+    justClickedUnclusteredRef,
+
   };
 };
 

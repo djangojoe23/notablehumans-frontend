@@ -1,38 +1,16 @@
-// Globe.js
-import React, { useEffect, useRef } from 'react';
+import React, {useEffect, useRef} from 'react';
 import mapboxgl from 'mapbox-gl';
-import { SIDEBAR_WIDTH } from '../constants/layout';
-import updateClusterVisualStates from '../utils/updateClusterVisualStates';
-import { isMarkerStillFocused } from '../utils/mapValidation';
-import { updateHaloForFeature } from '../utils/mapUtils';
-import useClusterExpansion from '../hooks/useClusterExpansion';
-import useSidebarMapPadding from '../hooks/useSidebarMapPadding';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
+import updateClusterVisualStates from "../utils/updateClusterVisualStates";
+import { updateHaloForDetailedHuman, activateHaloForUnclustered} from '../utils/haloUtils';
 
-const Globe = ({
-  globeRef,
-  notableHumans,
-  setSelectedListHuman,
-  setSelectedClusterHumans,
-  sidebarOpen,
-  setSidebarOpen,
-  sidebarTrigger,
-  setSidebarTrigger,
-  lastMarkerCoordinates,
-  setLastMarkerCoordinates,
-  pendingClusterExpansion,
-  setPendingClusterExpansion,
-  setSidebarMode,
-  focusedZoomRef, lastMarkerCoordinatesRef, sidebarModeRef,
-  setExpandedHumanId,
-  haloPersistRef, currentHaloFeatureRef, pulseAnimationFrameRef, isAnimatingRef
-}) => {
+const Globe = (globeState) => {
   const containerRef = useRef(null);
-  const didFlyToCluster = useRef(false);
 
-  // === Restore map initialization ===
+
   useEffect(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current || !globeState.notableHumanData) return;
 
     const globe = new mapboxgl.Map({
       container: containerRef.current,
@@ -45,14 +23,14 @@ const Globe = ({
       projection: 'globe',
     });
 
-    globeRef.current = globe;
+    globeState.globeRef.current = globe;
 
     globe.on('load', () => {
       globe.addSource('humans', {
         type: 'geojson',
-        data: notableHumans,
+        data: globeState.notableHumanData,
         cluster: true,
-        clusterMaxZoom: 20,
+        clusterMaxZoom: 16,
         clusterRadius: 50,
       });
 
@@ -62,11 +40,18 @@ const Globe = ({
         source: 'humans',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color': [
+          'circle-color': '#f28cb1',
+          'circle-stroke-color': [
             'case',
             ['boolean', ['feature-state', 'fullyOverlapping'], false],
-            '#f28cb1',
-            '#11b4da',
+            '#666',
+            'transparent'
+          ],
+          'circle-stroke-width': [
+            'case',
+            ['boolean', ['feature-state', 'fullyOverlapping'], false],
+            2,
+            0
           ],
           'circle-radius': [
             'step',
@@ -88,6 +73,9 @@ const Globe = ({
           'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
           'text-size': 12,
         },
+        paint: {
+          'text-color': '#444',
+        },
       });
 
       globe.addLayer({
@@ -97,9 +85,26 @@ const Globe = ({
         filter: ['!', ['has', 'point_count']],
         paint: {
           'circle-color': '#f28cb1',
-          'circle-radius': 6,
-          'circle-stroke-width': 1,
-          'circle-stroke-color': '#fff',
+          'circle-radius': 10,
+          'circle-stroke-width': 2,
+          'circle-stroke-color': '#666'
+        },
+      });
+
+      globe.addLayer({
+        id: 'singleton-count',
+        type: 'symbol',
+        source: 'humans',
+        filter: ['!', ['has', 'point_count']],
+        layout: {
+          'text-field': '1',
+          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-size': 10,
+          'text-ignore-placement': true,
+          'text-allow-overlap': true,
+        },
+        paint: {
+          'text-color': '#444',
         },
       });
 
@@ -118,132 +123,18 @@ const Globe = ({
         paint: {
           'circle-radius': ['+', ['get', 'baseRadius'], ['get', 'pulseOffset']],
           'circle-color': '#f28cb1',
-          'circle-opacity': 0.5
+          'circle-opacity': 0.5,
+          'circle-stroke-color': 'rgba(255, 255, 255, 0.8)',
+          'circle-stroke-width': 2
         }
+      });
+
+      globe.once('idle', () => {
+        updateClusterVisualStates(globe);
       });
 
       globe.on('moveend', () => {
-        setTimeout(() => updateClusterVisualStates(globe), 100);
-
-        const currentMode = sidebarModeRef.current;
-        const lastCoords = lastMarkerCoordinatesRef.current;
-
-        if (currentMode !== 'location' || !lastCoords) return;
-
-        const stillFocused = isMarkerStillFocused({
-          globe,
-          targetLngLat: lastCoords,
-          focusedZoom: focusedZoomRef.current ?? globe.getZoom()
-        });
-
-        if (!stillFocused) {
-          const all = notableHumans?.features?.map(f => ({
-            ...f.properties,
-            lat: f.geometry.coordinates[1],
-            lng: f.geometry.coordinates[0],
-          })) ?? [];
-
-          const sorted = all.sort((a, b) => a.n.localeCompare(b.n));
-          setSelectedClusterHumans(sorted);
-          setLastMarkerCoordinates(null);
-          setPendingClusterExpansion(null);
-          setSidebarMode('all');
-          lastMarkerCoordinatesRef.current = null;
-          focusedZoomRef.current = null;
-          setSelectedListHuman(null);
-          setExpandedHumanId(null);
-          cancelAnimationFrame(pulseAnimationFrameRef.current);
-          isAnimatingRef.current = false;
-          globe.getSource('halo').setData({ type: 'FeatureCollection', features: [] });
-        }
-      });
-
-      updateClusterVisualStates(globe);
-
-      globe.on('click', 'clusters', (e) => {
-        const cluster = globe.queryRenderedFeatures(e.point, { layers: ['clusters'] })[0];
-        if (!cluster) return;
-
-        const { cluster_id: clusterId } = cluster.properties;
-        const coordinates = cluster.geometry.coordinates;
-
-        if (!pendingClusterExpansion) setLastMarkerCoordinates(coordinates);
-        setSidebarTrigger('marker');
-
-        // Get the feature state
-        const state = globe.getFeatureState({ source: 'humans', id: clusterId });
-        const isFullyOverlapping = state?.fullyOverlapping ?? false;
-
-        // Always update expansion logic
-        setPendingClusterExpansion({ clusterId, coordinates, isFullyOverlapping });
-
-        // === ✨ Sidebar content behavior ===
-        if (isFullyOverlapping) {
-          setSidebarMode('location');
-          setLastMarkerCoordinates(coordinates);
-          focusedZoomRef.current = globe.getZoom();
-
-          globe.getSource('humans').getClusterLeaves(clusterId, Infinity, 0, (err, leaves) => {
-            if (err) return;
-            const sorted = leaves.map(leaf => ({
-              ...leaf.properties,
-              lat: leaf.geometry.coordinates[1],
-              lng: leaf.geometry.coordinates[0],
-            })).sort((a, b) => a.n.localeCompare(b.n));
-            setSelectedClusterHumans(sorted);
-
-            function computeMarkerRadius(pointCount) {
-              if (pointCount >= 30) return 25;
-              if (pointCount >= 10) return 20;
-              return 15;
-            }
-            const markerRadius = computeMarkerRadius(cluster.properties.point_count);
-            const haloRadius = markerRadius + 8; // or whatever glow offset you want
-            const clusterFeatureWithId = {
-              ...cluster,
-              id: cluster.properties.cluster_id, // assign Mapbox-compatible feature ID
-            };
-            updateHaloForFeature(
-              globe,
-              clusterFeatureWithId,
-              haloRadius,
-              haloPersistRef,
-              currentHaloFeatureRef,
-              pulseAnimationFrameRef,
-              isAnimatingRef
-            );
-          });
-        } else {
-          // Not fully overlapping — show everyone from the full dataset
-          setSidebarMode('all');
-          setSelectedListHuman(null);
-          setExpandedHumanId(null);
-          focusedZoomRef.current = null;
-
-          const all = notableHumans?.features?.map(f => ({
-            ...f.properties,
-            lat: f.geometry.coordinates[1],
-            lng: f.geometry.coordinates[0],
-          })) ?? [];
-
-          const sorted = all.sort((a, b) => a.n.localeCompare(b.n));
-          setSelectedClusterHumans(sorted);
-
-          // 🔥 Full halo cleanup
-          if (isAnimatingRef.current) {
-            cancelAnimationFrame(pulseAnimationFrameRef.current);
-            isAnimatingRef.current = false;
-          }
-
-          globe.getSource('halo').setData({
-            type: 'FeatureCollection',
-            features: [],
-          });
-
-          currentHaloFeatureRef.current = null;
-        }
-
-        if (!sidebarOpen) setSidebarOpen(true);
+        setTimeout(() => updateClusterVisualStates(globe), 250);
       });
 
       globe.on('click', 'unclustered-point', (e) => {
@@ -256,46 +147,15 @@ const Globe = ({
           lat: coordinates[1],
           lng: coordinates[0],
         };
-        setSelectedClusterHumans([human]);
-        setSidebarTrigger('marker');
-        setLastMarkerCoordinates(coordinates);
-        setSidebarMode('location');
-        focusedZoomRef.current = globe.getZoom();
 
-        setSelectedListHuman(human);
-        setExpandedHumanId(human.id);
+        globeState.justClickedUnclusteredRef.current = true;
 
-        const featureWithId = {
-          ...feature,
-          id: feature.id ?? feature.properties.id, // fallback to a unique identifier you control
-        };
-        updateHaloForFeature(
-          globe,
-          featureWithId,
-          feature.properties.markerRadius+8 || 18,
-          haloPersistRef,
-          currentHaloFeatureRef,
-          pulseAnimationFrameRef,
-          isAnimatingRef
-        );
-
-        if (sidebarOpen) {
-          globe.easeTo({
-            center: coordinates,
-            padding: { left: SIDEBAR_WIDTH, right: 0, top: 0, bottom: 0 },
-            duration: 600,
-            easing: t => t,
-            essential: true,
-          });
-        } else {
-          setSidebarOpen(true);
+        globeState.setDetailedHuman(human);
+        if (!globeState.sidebarOpen) {
+          globeState.setSidebarOpen(true);
         }
-      });
 
-      globe.on('mouseenter', 'clusters', () => globe.getCanvas().style.cursor = 'pointer');
-      globe.on('mouseleave', 'clusters', () => globe.getCanvas().style.cursor = '');
-      globe.on('mouseenter', 'unclustered-point', () => globe.getCanvas().style.cursor = 'pointer');
-      globe.on('mouseleave', 'unclustered-point', () => globe.getCanvas().style.cursor = '');
+      });
     });
 
     const handleResize = () => globe.resize();
@@ -304,29 +164,66 @@ const Globe = ({
     return () => {
       window.removeEventListener('resize', handleResize);
       globe.remove();
-      globeRef.current = null;
+      globeState.globeRef.current = null;
     };
-  }, [notableHumans]);
+  }, [globeState.notableHumanData]);
 
-  // === Cluster expansion hook ===
-  useClusterExpansion({
-    globeRef,
-    sidebarOpen,
-    sidebarTrigger,
-    pendingClusterExpansion,
-    setPendingClusterExpansion,
-    setLastMarkerCoordinates
+  useSidebarGlobePadding({
+    globeRef: globeState.globeRef,
+    sidebarOpen: globeState.sidebarOpen,
   });
 
-  // apply flyTo/padding behavior when sidebar is opened/closed
-  useSidebarMapPadding({
-    globeRef,
-    sidebarOpen,
-    sidebarTrigger,
-    lastMarkerCoordinates,
-    pendingClusterExpansion,
-    didFlyToCluster
-  });
+// When a human is selected in sidebar: fly, halo, and keep synced on zoom/pan
+  useEffect(() => {
+    const map = globeState.globeRef.current;
+    const human = globeState.detailedHuman;
+    if (!map) return;
+
+    // helper to clear existing halo
+    const clearHalo = () => {
+      const src = map.getSource('halo');
+      if (src) src.setData({ type: 'FeatureCollection', features: [] });
+      if (globeState.haloAnimationFrameRef.current) {
+        cancelAnimationFrame(globeState.haloAnimationFrameRef.current);
+        globeState.isHaloActiveRef.current = false;
+      }
+    };
+
+    // if panel closed, clear and exit
+    if (!human) {
+      clearHalo();
+      return;
+    }
+
+    // fly to human at current zoom
+    const zoom = map.getZoom();
+    const lng = parseFloat(human.lng);
+    const lat = parseFloat(human.lat);
+    map.flyTo({ center: [lng, lat], zoom, essential: true });
+
+    // after initial move, draw halo around correct cluster/point
+    const afterMove = () => {
+      void updateHaloForDetailedHuman(map, human, globeState);
+      map.off('moveend', afterMove);
+    };
+    map.once('moveend', afterMove);
+
+    // on subsequent zoom/pan, re-draw halo (no re-centering)
+    const updateOnMoveEnd = () => {
+      void updateHaloForDetailedHuman(map, human, globeState);
+    };
+    map.on('moveend', updateOnMoveEnd);
+
+    // cleanup listener and clear halo on change/close
+    return () => {
+      map.off('moveend', updateOnMoveEnd);
+      clearHalo();
+    };
+  }, [globeState.detailedHuman]);
+
+
+
+
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

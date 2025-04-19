@@ -20,24 +20,37 @@ html, body, #root {
   overflow: hidden;
 }
 
-/*.clickable-row {*/
-/*  !* Use box-sizing so padding doesn't increase the set height *!*/
-/*  box-sizing: border-box;*/
-/*  padding: 0 12px;       !* Remove vertical padding so height stays consistent *!*/
-/*  height: 40px;          !* Matches react-window's inline height *!*/
-/*  border-bottom: 2px solid #f2f2f2;*/
-/*  cursor: pointer;*/
-/*  transition: background-color 0.2s ease;*/
-/*  display: flex;         !* Use flex layout *!*/
-/*  align-items: center;   !* Center children vertically *!*/
-/*}*/
+.sidebar-row {
+  transition: background-color 0.2s ease;
+}
 
-/*.clickable-row:hover {*/
-/*  background-color: rgba(242, 140, 177, 0.4);*/
-/*}*/
+.sidebar-row:hover {
+  background-color: rgba(0, 0, 0, 0.05); /* light gray hover */
+}
 
+.human-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;       /* space between items */
+  margin-bottom: 0.5rem;
+  flex-wrap: nowrap;  /* never wrap */
+}
 
-/*.clickable-name {*/
-/*  font-size: clamp(12px, 2vw, 16px);*/
-/*  text-decoration: underline;*/
-/*}*/
+.human-detail-header h2 {
+  flex: 1 1 0;        /* fill but shrink if needed */
+  min-width: 0;       /* allow shrinking */
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 1.25rem; /* adjust to match your design */
+  font-weight: 600;
+  margin: 0;
+}
+
+.human-detail-header button {
+  flex: 0 0 auto;     /* fixed size, never shrink */
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}

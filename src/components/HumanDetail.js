@@ -3,6 +3,7 @@ import { ATTRIBUTE_LABELS } from "../constants/humanAttributeLabels";
 import { formatYear } from '../utils/format';
 import { FaMapMarkerAlt, FaInfo, FaWikipediaW } from 'react-icons/fa';
 import { SiWikidata } from "react-icons/si";
+import { PiListMagnifyingGlass } from "react-icons/pi";
 
 
 export const formatAttributeLabel = (key) => {
@@ -18,7 +19,8 @@ const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
 
   const {
     n: name,
-      id: wikidataId,
+    d: description,
+    id: wikidataId,
     wu: wikipediaSlug,
     lat,
     lng,
@@ -43,6 +45,23 @@ const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
         {name}
       </h2>
 
+        {/* Subtitle / description */}
+      {description && (
+        <p
+          style={{
+            fontSize: '1rem',
+            fontWeight: 400,
+            margin: '0.25rem 0',
+            color: '#666',
+            overflow: 'hidden',
+            whiteSpace: 'nowrap',
+            textOverflow: 'ellipsis'
+          }}
+        >
+          {description}
+        </p>
+      )}
+
       {/* Icons below name */}
       <div style={{
         display: 'flex',
@@ -56,7 +75,7 @@ const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
             title="Scroll to name in list"
             style={{ background: 'none', border: 'none', cursor: 'pointer' }}
         >
-            <FaInfo size={20} />
+            <PiListMagnifyingGlass size={20} />
         </button>
 
         <button

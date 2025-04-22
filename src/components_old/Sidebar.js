@@ -11,7 +11,7 @@ import {
 } from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
 import HumanDetail from '../components/HumanDetail';
-import SortControls from './SortControls';
+import SortControls from '../components/SortControls';
 import { formatYear } from '../utils/format';
 import { sortHumansComparator } from '../utils/sortHumans';
 

@@ -8,6 +8,8 @@ import { sortHumansComparator } from '../utils/sortHumans';
 import {formatYear} from "../utils/format";
 import OverflowTooltip from "./OverflowTooltip"
 import HumanDetail from './HumanDetail';
+import SortControls from './SortControls';
+
 
 
 const Sidebar = (globeState) => {
@@ -20,8 +22,8 @@ const Sidebar = (globeState) => {
           lat: f.geometry.coordinates[1],
           lng: f.geometry.coordinates[0]
       }));
-      return humans.sort(sortHumansComparator('n', true));
-    }, [globeState.notableHumanData]);
+      return [...humans].sort(sortHumansComparator(globeState.sortBy, globeState.sortAsc));
+    }, [globeState.notableHumanData, globeState.sortBy, globeState.sortAsc]);
 
     const getItemSize = () => 36; // fixed row height for now
 
@@ -139,6 +141,15 @@ const Sidebar = (globeState) => {
                 All Notable Humans ({sortedHumans.length})
               </h3>
             </div>
+
+            {sortedHumans.length > 0 && (
+              <SortControls
+                sortBy={globeState.sortBy}
+                setSortBy={globeState.setSortBy}
+                sortAsc={globeState.sortAsc}
+                setSortAsc={globeState.setSortAsc}
+              />
+            )}
 
             <div
               style={{

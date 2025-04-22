@@ -1,13 +1,16 @@
 import React, {useEffect, useRef} from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+
 import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
 import updateClusterVisualStates from "../utils/updateClusterVisualStates";
-import { updateHaloForDetailedHuman, activateHaloForUnclustered} from '../utils/haloUtils';
+import { updateHaloForDetailedHuman} from '../utils/haloUtils';
+import { buildClusterPopup } from '../utils/clusterPopup';
 
 const Globe = (globeState) => {
   const containerRef = useRef(null);
   const popupRef = useRef(null);
+  const clusterWithPopupRef = useRef({ clusterId: null, lngLat: null, totalCount: 0 });
 
 
   useEffect(() => {
@@ -152,209 +155,29 @@ const Globe = (globeState) => {
         globeState.justClickedUnclusteredRef.current = true;
 
         globeState.setDetailedHuman(human);
-        if (!globeState.sidebarOpen) {
+        if (!globeState.sidebarOpenRef.current) {
           globeState.setSidebarOpen(true);
         }
 
       });
 
       globe.on('click', 'clusters', (e) => {
-        if (popupRef.current) {
-          popupRef.current.remove();
-          popupRef.current = null;
-        }
         const feature   = e.features[0];
         const clusterId = feature.properties.cluster_id;
-        const src       = globe.getSource('humans');
-        const lngLat    = e.lngLat;
+        const [clusterLng, clusterLat] = feature.geometry.coordinates;
+        const lngLat     = [clusterLng, clusterLat];
+        const totalCount = feature.properties.point_count;
 
-        // state
-        let offset    = 0;
-        const PAGE_SIZE = 50;
-        let loading   = false;
-        let done      = false;
-        const LOAD_THRESHOLD = 0.75; // 75%
+        clusterWithPopupRef.current = { clusterId, lngLat, totalCount };
 
-        // container
-        const container = document.createElement('div');
-        container.style.display        = 'flex';
-        container.style.flexDirection  = 'column';
-        container.style.position       = 'relative';
-        container.style.width          = '100%';
-        container.style.maxHeight      = '360px';
-        container.style.boxSizing      = 'border-box';
-
-        // close button
-        const closeBtn = document.createElement('button');
-        closeBtn.textContent          = '×';
-        closeBtn.style.position       = 'absolute';
-        closeBtn.style.top            = '8px';
-        closeBtn.style.right          = '8px';
-        closeBtn.style.border         = 'none';
-        closeBtn.style.background     = 'transparent';
-        closeBtn.style.fontSize       = '16px';
-        closeBtn.style.cursor         = 'pointer';
-        container.appendChild(closeBtn);
-
-        // Header showing total count
-        const total = feature.properties.point_count;
-        const header = document.createElement('div');
-        header.textContent            = `${total} Notable Humans`;
-        header.style.padding = '8px 32px 8px 8px';
-        header.style.fontWeight       = 'bold';
-        header.style.textAlign        = 'left';
-        header.style.borderBottom     = '1px solid #ddd';
-        container.appendChild(header);
-
-        // scrollable list
-        const listDiv = document.createElement('div');
-        listDiv.style.flex            = '1';
-        listDiv.style.overflowY       = 'auto';
-        listDiv.style.padding         = '8px 8px 8px';    // top padding leaves room for closeBtn
-        listDiv.style.boxSizing       = 'border-box';
-        listDiv.style.width           = '100%';
-        container.appendChild(listDiv);
-
-        // popup
-        const popup = new mapboxgl.Popup({ closeButton: false, closeOnClick: false, maxWidth: '280px' })
-          .setLngLat(lngLat)
-          .setDOMContent(container)
-          .addTo(globe);
-        popupRef.current = popup;
-
-        function onScroll() {
-          if (done || loading) return;
-          const { scrollTop, scrollHeight, clientHeight } = listDiv;
-          if (scrollTop + clientHeight >= LOAD_THRESHOLD * scrollHeight) {
-            loadMore();
-          }
-        }
-
-        listDiv.addEventListener('scroll', onScroll);
-
-        // helper to load next batch
-        function loadMore() {
-          if (loading || done) return;
-          loading = true;
-          src.getClusterLeaves(clusterId, PAGE_SIZE, offset, (err, leaves) => {
-            loading = false;
-            if (err) return console.error(err);
-
-            // inside loadMore(), instead of just setting textContent:
-            leaves.forEach(l => {
-              // 1) create the row div
-              const row = document.createElement('div');
-              row.style.padding      = '4px 0';
-              row.style.borderBottom = '1px solid #eee';
-              row.style.cursor       = 'pointer';       // show it’s clickable
-              row.textContent        = l.properties.n;
-
-              // 2) hover effect
-              row.addEventListener('mouseenter', () => {
-                row.style.backgroundColor = '#f0f0f0';
-              });
-              row.addEventListener('mouseleave', () => {
-                row.style.backgroundColor = '';
-              });
-
-              // 2) wire up click to mirror handleRowClick from Sidebar
-              row.addEventListener('click', () => {
-                // build the same human object you use elsewhere
-                const human = {
-                  ...l.properties,
-                  lat: l.geometry.coordinates[1],
-                  lng: l.geometry.coordinates[0],
-                };
-
-                // 2a) fly the globe
-                const map = globeState.globeRef.current;
-                if (map) {
-                  map.flyTo({
-                    center: [human.lng, human.lat],
-                    zoom: map.getZoom(),
-                    essential: true,
-                  });
-                }
-
-                // 2b) open the sidebar & set detailedHuman
-                globeState.setDetailedHuman(human);
-                if (!globeState.sidebarOpen) {
-                  globeState.setSidebarOpen(true);
-                }
-              });
-
-              // 3) append into your list
-              listDiv.appendChild(row);
-            });
-
-            // advance offset & check completion
-            offset += leaves.length;
-            if (leaves.length < PAGE_SIZE) {
-              done = true;
-            }
-          });
-        }
-
-        // initial load
-        loadMore();
-
-        // ← NEW MOVEEND LOGIC
-        // remember where we started, and close or refresh on zoom/pan
-        const [origLng, origLat] = feature.geometry.coordinates;
-        // NEW: watch map moves
-        function onMapMoveEnd() {
-          // if popup was already closed, stop listening
-          if (!popupRef.current) {
-            globe.off('moveend', onMapMoveEnd);
-            return;
-          }
-
-          // project the cluster centroid back to screen pixels
-          const pt = globe.project({ lng: origLng, lat: origLat });
-
-          // query exactly that pixel in the clusters layer
-          const hits = globe.queryRenderedFeatures(pt, { layers: ['clusters'] });
-          const stillHere = hits.length
-            && hits[0].properties.cluster_id === clusterId;
-
-          if (!stillHere) {
-            // cluster vanished or split → close everything
-            listDiv.removeEventListener('scroll', onScroll);
-            globe.off('moveend', onMapMoveEnd);
-            popupRef.current.remove();
-            popupRef.current = null;
-          }
-        }
-        globe.on('moveend', onMapMoveEnd);
-
-        // reposition on every moveend so it stays glued
-        function updatePopupAnchor() {
-          const popup = popupRef.current;
-          if (!popup) {
-            globe.off('moveend', updatePopupAnchor);
-            return;
-          }
-
-          // 1) snap it back to the cluster’s real coord
-          popup.setLngLat([origLng, origLat]);
-
-          // 2) auto-close if the cluster is no longer in view
-          const bounds = globe.getBounds();
-          if (!bounds.contains([origLng, origLat])) {
-            popup.remove();
-            popupRef.current = null;
-            globe.off('moveend', updatePopupAnchor);
-          }
-        }
-        globe.on('moveend', updatePopupAnchor);
-
-        // close button
-        closeBtn.addEventListener('click', () => {
-          listDiv.removeEventListener('scroll', onScroll);
-          globe.off('moveend', onMapMoveEnd);
-          popup.remove();
-          popupRef.current = null;
-        });
+        buildClusterPopup(
+          globe,
+          globeState,
+          popupRef,
+          clusterId,
+          lngLat,
+          totalCount
+        );
       });
     });
 
@@ -421,9 +244,19 @@ const Globe = (globeState) => {
     };
   }, [globeState.detailedHuman]);
 
+  useEffect(() => {
+    const { clusterId, lngLat, totalCount } = clusterWithPopupRef.current;
+    if (!clusterId || !popupRef.current) return;
 
-
-
+    buildClusterPopup(
+      globeState.globeRef.current,
+      globeState,
+      popupRef,
+      clusterId,
+      lngLat,
+      totalCount
+    );
+  }, [globeState.sortBy, globeState.sortAsc]);
 
   return (
     <div style={{ position: 'relative', width: '100%', height: '100%' }}>

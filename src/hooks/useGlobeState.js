@@ -1,4 +1,6 @@
 import { useState, useRef } from 'react';
+import useSyncedStateWithRef from './useSyncedStateWithRef';
+
 
 const useGlobeState = () => {
   const globeRef = useRef(null);
@@ -6,7 +8,7 @@ const useGlobeState = () => {
   const [notableHumanData, setNotableHumanData] = useState(null);
   const [dataLoadError, setDataLoadError] = useState(null);
 
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen, sidebarOpenRef] = useSyncedStateWithRef(false);
 
   const [detailedHuman, setDetailedHuman] = useState(null);
 
@@ -17,6 +19,9 @@ const useGlobeState = () => {
 
   const justClickedUnclusteredRef = useRef(null);
 
+  const [sortBy,  setSortBy,  sortByRef]  = useSyncedStateWithRef('n');
+  const [sortAsc, setSortAsc, sortAscRef] = useSyncedStateWithRef(true);
+
 
 
   return {
@@ -25,13 +30,16 @@ const useGlobeState = () => {
     notableHumanData, setNotableHumanData,
     dataLoadError, setDataLoadError,
 
-    sidebarOpen, setSidebarOpen,
+    sidebarOpen, setSidebarOpen, sidebarOpenRef,
 
     detailedHuman, setDetailedHuman,
 
     isHaloActiveRef, haloAnimationFrameRef, haloPersistRef, currentHaloFeatureRef,
 
     justClickedUnclusteredRef,
+
+    sortBy, setSortBy, sortByRef,
+    sortAsc, setSortAsc, sortAscRef,
 
   };
 };

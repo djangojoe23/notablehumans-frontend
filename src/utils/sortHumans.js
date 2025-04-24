@@ -1,32 +1,34 @@
 // src/utils/sortHumans.js
 export const sortHumansComparator = (sortBy, sortAsc) => (a, b) => {
+    // multiplier so we can just flip the sign
+  const m = sortAsc ? 1 : -1
+
+  // helper: compare two ISO dates as strings, treating missing as “last”
+  const compareISO = (key) => {
+    const aVal = a[key] ?? ''
+    const bVal = b[key] ?? ''
+
+    if (!aVal && bVal) return  1 * m   // a missing → after b
+    if (aVal && !bVal) return -1 * m   // b missing → after a
+    return aVal.localeCompare(bVal) * m
+  }
+
   // Assuming the human object properties are in 'n', 'by', etc.
   switch (sortBy) {
     case 'n':
       return sortAsc
         ? (a.n || '').localeCompare(b.n || '')
         : (b.n || '').localeCompare(a.n || '');
-    case 'by': {
-      const aHasBirth = a.by != null;
-      const bHasBirth = b.by != null;
-      if (aHasBirth && !bHasBirth) return -1;
-      if (!aHasBirth && bHasBirth) return 1;
-      if (!aHasBirth && !bHasBirth) return 0;
-      return sortAsc ? a.by - b.by : b.by - a.by;
+    case 'bd': {
+      return compareISO('bd')
     }
-    case 'dy': {
-      const isADied = a.dy != null;
-      const isBDied = b.dy != null;
-      if (isADied && !isBDied) return sortAsc ? -1 : 1;
-      if (!isADied && isBDied) return sortAsc ? 1 : -1;
-      if (!isADied && !isBDied) {
-        const aBirth = a.by ?? Infinity;
-        const bBirth = b.by ?? Infinity;
-        return sortAsc ? aBirth - bBirth : bBirth - aBirth;
-      }
-      const aDeath = a.dy ?? Infinity;
-      const bDeath = b.dy ?? Infinity;
-      return sortAsc ? aDeath - bDeath : bDeath - aDeath;
+    case 'dd': {
+       // sort by death date, but if neither died, fall back to birth date
+      const aD = a.dd, bD = b.dd
+      if (!aD && bD) return  1 * m
+      if (aD && !bD) return -1 * m
+      if (!aD && !bD) return compareISO('bd')
+      return compareISO('dd')
     }
     case 'al': // article length
     case 'rv': // recent views

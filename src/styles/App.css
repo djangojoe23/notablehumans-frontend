@@ -1,0 +1,23 @@
+/* Ensure the entire page fits without scrolling */
+html, body, #root {
+  height: 100vh; /* Full viewport height */
+  margin: 0;
+  padding: 0;
+  overflow: hidden; /* Prevents both horizontal and vertical scrolling */
+}
+
+
+:root {
+  --color-text:   #444;
+  --color-icon:   #555;
+  --color-hover:  #f28cb1;
+  --spacing-sm:   0.25rem;
+  --spacing-md:   0.5rem;
+  --spacing-lg:   1rem;
+  --font-base:    0.9rem;
+  --font-heading: 1.1rem;
+  /* value from 0 (min) up to 1 (max) set by your JS animation loop */
+  --pulse-ratio:  0; /* updated in JS */
+}
+
+

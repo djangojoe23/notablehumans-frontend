@@ -1,0 +1,111 @@
+
+.human-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;       /* space between items */
+  margin-bottom: 0.125rem;
+  flex-wrap: nowrap;  /* never wrap */
+}
+
+.human-detail-header h2 {
+  flex: 1 1 0;        /* fill but shrink if needed */
+  min-width: 0;       /* allow shrinking */
+  overflow: visible;
+  white-space: normal;
+  text-overflow: unset;
+  word-break: break-word;
+  overflow-wrap: break-word;
+  font-size: 1.1rem; /* adjust to match your design */
+  font-weight: 600;
+  margin: 0;
+}
+
+.human-detail-header button {
+  flex: 0 0 auto;     /* fixed size, never shrink */
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  margin-left: 0.5rem;
+}
+
+.human-detail-desc {
+  margin-top: 0;        /* kill any extra top-gap */
+  margin-bottom: 0.5rem;/* optional: control bottom-gap */
+  color: #444;          /* match .human-attributes dd */
+}
+
+/* human-detail container can have its own padding/margins as needed */
+.human-detail {
+  width: 100%;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+/* ===== Attributes grid ===== */
+.human-attributes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /*gap: 0.25rem 1rem;*/
+  margin-top: 0.5rem;
+}
+.human-attributes dt {
+  font-weight: 600;
+}
+.human-attributes dd {
+  margin: 0;
+  color: #444;
+}
+/* ===== Human Attributes Striping ===== */
+/* give each label & value some breathing room */
+.human-attributes dt,
+.human-attributes dd {
+  padding: 0.25rem 0.5rem;
+}
+
+/* stripe every 2nd attribute pair */
+/* dt:nth-of-type and dd:nth-of-type count pairs separately */
+.human-attributes dt:nth-of-type(even),
+.human-attributes dd:nth-of-type(even) {
+  background-color: rgba(0, 0, 0, 0.03);
+}
+
+/* ===== Icons row ===== */
+.human-detail-icons {
+  display: flex;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+
+.human-detail-icons .icon-cell {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* Separator on all but the last cell */
+.human-detail-icons .icon-cell:not(:last-child) {
+  border-right: 1px solid #ccc;
+}
+
+button.detail-icon{
+  background: none;
+  border: none;
+  padding: 0;       /* kill any extra internal spacing */
+  cursor: pointer;
+  outline: none;    /* optional—removes focus ring if you don’t want it */
+}
+
+.detail-icon {
+  /* base color for all these icons */
+  color: #555;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.detail-icon:hover {
+  /* match your accent/pulse color */
+  color: #f28cb1;
+  /* a tiny pop to indicate interactivity */
+  transform: scale(1.1);
+}

@@ -1,10 +1,11 @@
-import React from "react";
-import { ATTRIBUTE_LABELS } from "../constants/humanAttributeLabels";
-import { formatYear } from '../utils/format';
-import { FaMapMarkerAlt, FaInfo, FaWikipediaW } from 'react-icons/fa';
-import { SiWikidata } from "react-icons/si";
-import { PiListMagnifyingGlass } from "react-icons/pi";
+import React from 'react';
+import { ATTRIBUTE_LABELS } from '../constants/humanAttributeLabels';
+import { formatDate } from '../utils/format';
+import { FaMapMarkerAlt, FaWikipediaW } from 'react-icons/fa';
+import { SiWikidata } from 'react-icons/si';
+import { PiListMagnifyingGlass } from 'react-icons/pi';
 
+import '../styles/components/human-detail.css';
 
 export const formatAttributeLabel = (key) => {
   const rawLabel = ATTRIBUTE_LABELS[key] || key;
@@ -25,124 +26,101 @@ const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
     lat,
     lng,
     by,
+    bd,
     bp,
     dy,
+    dd,
     dp,
     ...attributes
   } = person;
 
-   return (
-    <div className="human-info" style={{ width: '100%' }}>
-      {/* Name */}
-      <h2 style={{
-        fontSize: '1.25rem',
-        fontWeight: 600,
-        margin: 0,
-        overflow: 'hidden',
-        whiteSpace: 'nowrap',
-        textOverflow: 'ellipsis'
-      }}>
-        {name}
-      </h2>
-
-        {/* Subtitle / description */}
-      {description && (
-        <p
-          style={{
-            fontSize: '1rem',
-            fontWeight: 400,
-            margin: '0.25rem 0',
-            color: '#666',
-            overflow: 'hidden',
-            whiteSpace: 'nowrap',
-            textOverflow: 'ellipsis'
-          }}
-        >
-          {description}
-        </p>
-      )}
-
-      {/* Icons below name */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '0.5rem',
-        margin: '0.5rem 0'
-      }}>
-
-        <button
-            onClick={() => scrollToPerson?.(person)}
-            title="Scroll to name in list"
-            style={{ background: 'none', border: 'none', cursor: 'pointer' }}
-        >
-            <PiListMagnifyingGlass size={20} />
-        </button>
-
-        <button
-         onClick={() => onFlyTo?.({lng, lat})}
-        title="Fly to marker"
-        style={{ flex: '0 0 auto', padding: 0, background: 'none', border: 'none', cursor: 'pointer' }}
-      >
-        <FaMapMarkerAlt style={{ width: '1.25rem', height: '1.25rem' }} />
-      </button>
-
-        <a
-          href={`https://en.wikipedia.org/wiki/${wikipediaSlug}`}
-          target="_blank"
-          rel="noreferrer"
-          title="View Wikipedia Entry"
-          style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-        >
-          <FaWikipediaW size={20} />
-        </a>
-
-          <a
-          href={`https://www.wikidata.org/wiki/${wikidataId}`}
-          target="_blank"
-          rel="noreferrer"
-          title="View Wikidata Entry"
-          style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer' }}
-        >
-          <SiWikidata size={20} />
-        </a>
+  return (
+    <div className="human-detail">
+      {/* Header */}
+      <div className="human-detail-header">
+        <h2>{name}</h2>
       </div>
 
-      {/* Birth / Death Info */}
-      <p>
-        <strong>Born:</strong>{' '}
-        {by != null ? `${formatYear(by)}${bp ? ` in ${bp}` : ''}` : 'Unknown'}
-      </p>
-      <p>
-        <strong>Died:</strong>{' '}
-        {dy != null ? `${formatYear(dy)}${dp ? ` in ${dp}` : ''}` : 'Unknown'}
-      </p>
+      {/* Description */}
+      {description && (
+        <p className="human-detail-desc">{description}</p>
+      )}
 
-      {/* Other attributes */}
-      {Object.entries(ATTRIBUTE_LABELS).map(([key]) => {
-        let value = attributes[key];
-        if (!value) return null;
+      {/* Icons Row */}
+      <div className="human-detail-icons">
+        <div className="icon-cell">
+          <button
+            onClick={() => scrollToPerson?.(person)}
+            title="Scroll to name in list"
+            className="detail-icon"
+          >
+            <PiListMagnifyingGlass size={20} />
+          </button>
+        </div>
+        <div className="icon-cell">
+          <button
+            onClick={() => onFlyTo?.({ lng, lat })}
+            title="Fly to marker"
+            className="pulse-icon"
+          >
+            <FaMapMarkerAlt size={20} />
+          </button>
+        </div>
+        <div className="icon-cell">
+          <a
+            href={`https://en.wikipedia.org/wiki/${wikipediaSlug}`}
+            target="_blank"
+            rel="noreferrer"
+            title="View Wikipedia entry"
+            className="detail-icon"
+          >
+            <FaWikipediaW size={20} />
+          </a>
+        </div>
+        <div className="icon-cell">
+          <a
+            href={`https://www.wikidata.org/wiki/${wikidataId}`}
+            target="_blank"
+            rel="noreferrer"
+            title="View Wikidata entry"
+            className="detail-icon"
+          >
+            <SiWikidata size={20} />
+          </a>
+        </div>
+      </div>
 
-        // Parse stringified arrays like '["politician"]'
-        if (
-          typeof value === 'string' &&
-          value.startsWith('[') &&
-          value.endsWith(']')
-        ) {
-          try {
-            const parsed = JSON.parse(value);
-            if (Array.isArray(parsed)) value = parsed;
-          } catch (err) {
-            // leave as-is
+      {/* Other Attributes */}
+      <dl className="human-attributes">
+          <dt>Born</dt>
+          <dd>
+            {bd
+              ? `${formatDate(bd)}${bp ? ` in ${bp}` : ''}`
+              : 'Unknown'}
+          </dd>
+
+          {/* Died */}
+          <dt>Died</dt>
+          <dd>
+            {dd
+              ? `${formatDate(dd)}${dp ? ` in ${dp}` : ''}`
+              : '-'}
+          </dd>
+        {Object.entries(ATTRIBUTE_LABELS).map(([key]) => {
+          let value = attributes[key];
+          if (!value) return null;
+          // parse stringified arrays
+          if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+            try { value = JSON.parse(value); } catch {};
           }
-        }
-
-        return (
-          <p key={key}>
-            <strong>{formatAttributeLabel(key)}:</strong>{' '}
-            {Array.isArray(value) ? value.join(', ') : value}
-          </p>
-        );
-      })}
+          return (
+            <React.Fragment key={key}>
+              <dt>{formatAttributeLabel(key)}</dt>
+              <dd>{Array.isArray(value) ? value.join(', ') : value}</dd>
+            </React.Fragment>
+          );
+        })}
+      </dl>
     </div>
   );
 };

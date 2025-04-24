@@ -4,7 +4,8 @@ import Header from './components/Header';
 import Sidebar from './components/Sidebar';
 import Globe from './components/Globe';
 import useGlobeState from './hooks/useGlobeState';
-import './App.css';
+import './styles/App.css';
+import './styles/layout.css';
 
 function App() {
     const globeState = useGlobeState();

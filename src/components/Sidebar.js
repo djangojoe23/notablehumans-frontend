@@ -2,14 +2,14 @@ import React, {useEffect, useMemo, useRef} from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VariableSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-import { FaFilter, FaArrowRight, FaArrowLeft, FaTimes, FaInfo } from 'react-icons/fa';
+import {FaFilter, FaArrowRight, FaArrowLeft, FaTimes, FaMapMarkerAlt} from 'react-icons/fa';
 import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
 import { sortHumansComparator } from '../utils/sortHumans';
 import {formatYear} from "../utils/format";
 import OverflowTooltip from "./OverflowTooltip"
 import HumanDetail from './HumanDetail';
 import SortControls from './SortControls';
-
+import '../styles/components/sidebar.css';
 
 
 const Sidebar = (globeState) => {
@@ -48,7 +48,7 @@ const Sidebar = (globeState) => {
         return (
           <div
             key={human.id}
-            className="sidebar-row"
+            className={`sidebar-row${human.id === globeState.detailedHuman?.id ? ' pulsing' : ''}`}
             style={{
                 ...style,
                 padding: '0 10px',
@@ -76,9 +76,9 @@ const Sidebar = (globeState) => {
             </div>
 
             {human.id === globeState.detailedHuman?.id && (
-                <FaInfo
-                  className="text-blue-500 ml-2"
-                  title="Currently expanded"
+                <FaMapMarkerAlt
+                  className="pulse-icon ml-2"
+                  title="This is the selected person’s marker"
                 />
             )}
           </div>
@@ -94,7 +94,7 @@ const Sidebar = (globeState) => {
       if (index !== -1) {
         // match your panel‑open animation duration (0.3s)
         setTimeout(() => {
-          listRef.current.scrollToItem(index, 'end');
+          listRef.current.scrollToItem(index, 'auto');
         }, 300);
       }
     }, [globeState.detailedHuman, globeState.sidebarOpen, sortedHumans]);
@@ -104,7 +104,7 @@ const Sidebar = (globeState) => {
       const index = sortedHumans.findIndex(h => h.id === person.id);
       if (index !== -1 && listRef.current) {
         // new: always pin to the bottom
-        listRef.current.scrollToItem(index, 'end');
+        listRef.current.scrollToItem(index, 'auto');
       }
     };
 
@@ -186,7 +186,8 @@ const Sidebar = (globeState) => {
                       exit={{ height: 0, opacity: 0 }}
                       transition={{ duration: 0.3 }}
                       style={{
-                        overflow: 'hidden',
+                          maxHeight: '34vh',
+                        overflowY: 'auto',
                         background: '#fff',
                         borderTop: '1px solid #ccc',
                         boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.05)',

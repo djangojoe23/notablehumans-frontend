@@ -7,7 +7,7 @@ import useGlobeState from './hooks/useGlobeState';
 import throttle from 'lodash.throttle';
 import updateClusterVisualStates from './utils/updateClusterVisualStates';
 import { isMarkerStillFocused } from './utils/mapValidation'; // adjust path as needed
-import './App.css';
+import './styles/App.css';
 import {updateHaloForFeature} from "./utils/haloUtils";
 
 function App() {

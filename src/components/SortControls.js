@@ -12,12 +12,12 @@ const SortControls = ({ sortBy, setSortBy, sortAsc, setSortAsc }) => {
           style={{ marginLeft: 4 }}
         >
           <option value="n">Name</option>
-          <option value="by">Birth Year</option>
-          <option value="dy">Death Year</option>
-          <option value="cd">Created Date</option>
-          <option value="al">Article Length</option>
-          <option value="rv">Recent Views</option>
-          <option value="te">Total Edits</option>
+          <option value="bd">Birth Date</option>
+          <option value="dd">Death Date</option>
+          <option value="cd">Wikipedia Created Date</option>
+          <option value="al">Wikipedia Article Length</option>
+          <option value="rv">Wikipedia Recent Views</option>
+          <option value="te">Wikipedia Total Edits</option>
         </select>
       </label>
       <button

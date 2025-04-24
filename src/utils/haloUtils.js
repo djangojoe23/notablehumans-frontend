@@ -49,6 +49,13 @@ export function updateHaloForFeature(map, feature, globeState) {
       features: [haloFeature]
     });
 
+    // **SYNC** the sidebar pulse
+    const ratio = pulseOffset / baseRadius;
+    document.documentElement.style.setProperty(
+      '--pulse-ratio',
+      ratio
+    );
+
     haloAnimationFrameRef.current = requestAnimationFrame(animate);
   }
 
@@ -106,7 +113,7 @@ export async function updateHaloForDetailedHuman(map, human, globeState) {
         type: 'Feature',
         id: clusterId,
         geometry: { type: 'Point', coordinates: cluster.geometry.coordinates },
-        properties: { baseRadius: baseRadius + 8 }
+        properties: { baseRadius: baseRadius }
       };
 
       updateHaloForFeature(map, featureForHalo, globeState);
@@ -119,7 +126,7 @@ export async function updateHaloForDetailedHuman(map, human, globeState) {
     type: 'Feature',
     id: human.id,
     geometry: { type: 'Point', coordinates: [lng, lat] },
-    properties: { baseRadius: 18 }
+    properties: { baseRadius: 10 }
   };
   updateHaloForFeature(map, fallbackFeature, globeState);
   return null;

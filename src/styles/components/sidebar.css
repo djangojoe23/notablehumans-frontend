@@ -1,19 +1,19 @@
-/* always wrap your row icon in a little circle */
-.pulse-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  padding: 4px;
-  border: none;
-  background-color: rgba(242,140,177, calc(var(--pulse-ratio) * 0.7));
-  transition: none; /* we’ll drive it from JS */
-}
+/*!* always wrap your row icon in a little circle *!*/
+/*.pulse-icon {*/
+/*  display: inline-flex;*/
+/*  align-items: center;*/
+/*  justify-content: center;*/
+/*  border-radius: 50%;*/
+/*  padding: 4px;*/
+/*  border: none;*/
+/*  background-color: rgba(242,140,177, calc(var(--pulse-ratio) * 0.7));*/
+/*  transition: none; !* we’ll drive it from JS *!*/
+/*}*/
 
-.sidebar-row {
-  transition: background-color 0.2s ease;
-}
+/*.sidebar-row {*/
+/*  transition: background-color 0.2s ease;*/
+/*}*/
 
-.sidebar-row:hover {
-  background-color: rgba(0, 0, 0, 0.05); /* light gray hover */
-}
+/*.sidebar-row:hover {*/
+/*  background-color: rgba(0, 0, 0, 0.05); !* light gray hover *!*/
+/*}*/

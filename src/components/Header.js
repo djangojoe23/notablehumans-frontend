@@ -1,21 +1,14 @@
 import React from 'react';
+import { AppBar, Toolbar, Typography } from '@mui/material';
 
 const Header = () => (
-    <header
-        style={{
-            height: '60px',
-            backgroundColor: '#333',
-            color: '#fff',
-            display: 'flex',
-            alignItems: 'center',
-            padding: '0 20px',
-            boxSizing: 'border-box'
-        }}
-    >
-
-        <h1 style={{ margin: 0, fontSize: '1.5rem' }}>Notable Humans Project</h1>
-
-    </header>
+  <AppBar position="static" sx={{ height: '60px', justifyContent: 'center', backgroundColor: '#333' }}>
+    <Toolbar sx={{ minHeight: '60px', px: 2 }}>
+      <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
+        Notable Humans Project
+      </Typography>
+    </Toolbar>
+  </AppBar>
 );
 
 export default Header;

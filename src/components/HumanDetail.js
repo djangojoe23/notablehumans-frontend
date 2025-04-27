@@ -1,11 +1,12 @@
 import React from 'react';
+import { Box, Typography, IconButton, Link, Stack } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
+
 import { ATTRIBUTE_LABELS } from '../constants/humanAttributeLabels';
 import { formatDate } from '../utils/format';
 import { FaMapMarkerAlt, FaWikipediaW } from 'react-icons/fa';
 import { SiWikidata } from 'react-icons/si';
 import { PiListMagnifyingGlass } from 'react-icons/pi';
-
-import '../styles/components/human-detail.css';
 
 export const formatAttributeLabel = (key) => {
   const rawLabel = ATTRIBUTE_LABELS[key] || key;
@@ -15,7 +16,7 @@ export const formatAttributeLabel = (key) => {
     .join(' ');
 };
 
-const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
+const HumanDetail = ({ person, scrollToPerson, onFlyTo, onClose }) => {
   if (!person) return null;
 
   const {
@@ -34,94 +35,202 @@ const HumanDetail = ({ person, scrollToPerson, onFlyTo }) => {
     ...attributes
   } = person;
 
-  return (
-    <div className="human-detail">
-      {/* Header */}
-      <div className="human-detail-header">
-        <h2>{name}</h2>
-      </div>
+return (
+    <Box display="flex" flexDirection="column" height="100%">
+      {/* Sticky Top Header */}
+      <Box
+        position="sticky"
+        top={0}
+        zIndex={1}
+        bgcolor="#fff"
+        pt={1}
+        px={2}
+        borderBottom="1px solid"
+        borderColor="grey.300"
+      >
+        {/* Close Button */}
+        <IconButton
+          onClick={onClose}
+          size="small"
+          sx={{
+            position: 'absolute',
+            top: 4,
+            right: 4,
+            color: 'grey.600',
+          }}
+        >
+          <CloseIcon fontSize="small" />
+        </IconButton>
 
-      {/* Description */}
-      {description && (
-        <p className="human-detail-desc">{description}</p>
-      )}
+        <Typography variant="subtitle1" fontWeight="bold" noWrap sx={{ pr: 1 }}>
+          {name}
+        </Typography>
 
-      {/* Icons Row */}
-      <div className="human-detail-icons">
-        <div className="icon-cell">
-          <button
-            onClick={() => scrollToPerson?.(person)}
-            title="Scroll to name in list"
-            className="detail-icon"
-          >
-            <PiListMagnifyingGlass size={20} />
-          </button>
-        </div>
-        <div className="icon-cell">
-          <button
-            onClick={() => onFlyTo?.({ lng, lat })}
-            title="Fly to marker"
-            className="pulse-icon"
-          >
-            <FaMapMarkerAlt size={20} />
-          </button>
-        </div>
-        <div className="icon-cell">
-          <a
-            href={`https://en.wikipedia.org/wiki/${wikipediaSlug}`}
-            target="_blank"
-            rel="noreferrer"
-            title="View Wikipedia entry"
-            className="detail-icon"
-          >
-            <FaWikipediaW size={20} />
-          </a>
-        </div>
-        <div className="icon-cell">
-          <a
-            href={`https://www.wikidata.org/wiki/${wikidataId}`}
-            target="_blank"
-            rel="noreferrer"
-            title="View Wikidata entry"
-            className="detail-icon"
-          >
-            <SiWikidata size={20} />
-          </a>
-        </div>
-      </div>
+        {description && (
+          <Typography variant="caption" color="text.secondary" noWrap sx={{ mb: 1 }}>
+            {description}
+          </Typography>
+        )}
 
-      {/* Other Attributes */}
-      <dl className="human-attributes">
-          <dt>Born</dt>
-          <dd>
-            {bd
-              ? `${formatDate(bd)}${bp ? ` in ${bp}` : ''}`
-              : 'Unknown'}
-          </dd>
+        {/* Icon Row - evenly distributed */}
+        <Box
+        display="flex"
+        justifyContent="space-between"
+        alignItems="center"
+        mt={0.5}
+        mb={0}
+      >
+        {[
+          {
+            type: 'scroll',
+            icon: <PiListMagnifyingGlass size={18} />,
+            onClick: () => scrollToPerson?.(person),
+            title: 'Scroll to name in list',
+          },
+          {
+            type: 'fly',
+            onClick: () => onFlyTo?.({ lng, lat }),
+            title: 'Fly to marker',
+          },
+          {
+            type: 'link',
+            icon: <FaWikipediaW size={18} />,
+            href: `https://en.wikipedia.org/wiki/${wikipediaSlug}`,
+            title: 'View Wikipedia entry',
+          },
+          {
+            type: 'link',
+            icon: <SiWikidata size={18} />,
+            href: `https://www.wikidata.org/wiki/${wikidataId}`,
+            title: 'View Wikidata entry',
+          },
+        ].map((item, idx, arr) => (
+          <Box
+            key={idx}
+            display="flex"
+            alignItems="center"
+            justifyContent="center"
+            width="25%"
+            position="relative"
+          >
+            {item.type === 'link' ? (
+              <IconButton
+                component={Link}
+                href={item.href}
+                target="_blank"
+                rel="noopener"
+                size="small"
+                title={item.title}
+              >
+                {item.icon}
+              </IconButton>
+            ) : item.type === 'fly' ? (
+              <IconButton
+                onClick={item.onClick}
+                size="small"
+                title={item.title}
+                sx={{
+                  width: 36,
+                  height: 36,
+                  position: 'relative',
+                  overflow: 'visible',
+                }}
+              >
+                {/* Pulsing Halo */}
+                <Box
+                  sx={{
+                    position: 'absolute',
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: '#f28cb1',
+                    opacity: 0.4,
+                    transform: 'scale(calc(1 + var(--pulse-ratio) * 3))',
+                    transition: 'transform 16ms linear, opacity 16ms linear',
+                    zIndex: 0,
+                  }}
+                />
+                {/* Static Center Dot */}
+                <Box
+                  sx={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: '50%',
+                    backgroundColor: '#f28cb1',
+                    zIndex: 1,
+                  }}
+                />
+              </IconButton>
+            ) : (
+              <IconButton
+                onClick={item.onClick}
+                size="small"
+                title={item.title}
+              >
+                {item.icon}
+              </IconButton>
+            )}
+
+            {/* Vertical divider */}
+            {idx < arr.length - 1 && (
+              <Box
+                position="absolute"
+                top="25%"
+                bottom="25%"
+                right={0}
+                width="1px"
+                bgcolor="grey.300"
+              />
+            )}
+          </Box>
+        ))}
+      </Box>
+    </Box>
+
+      {/* Scrollable attributes */}
+      <Box flex={1} overflow="auto" p={2} pt={1}>
+        <Box component="dl" m={0}>
+          {/* Born */}
+          <Box component="div" mb={2}>
+            <Typography component="dt" variant="body2" fontWeight="bold">
+              Born
+            </Typography>
+            <Typography component="dd" variant="body2" ml={2} color="text.secondary">
+              {bd ? `${formatDate(bd)}${bp ? ` in ${bp}` : ''}` : 'Unknown'}
+            </Typography>
+          </Box>
 
           {/* Died */}
-          <dt>Died</dt>
-          <dd>
-            {dd
-              ? `${formatDate(dd)}${dp ? ` in ${dp}` : ''}`
-              : '-'}
-          </dd>
-        {Object.entries(ATTRIBUTE_LABELS).map(([key]) => {
-          let value = attributes[key];
-          if (!value) return null;
-          // parse stringified arrays
-          if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
-            try { value = JSON.parse(value); } catch {};
-          }
-          return (
-            <React.Fragment key={key}>
-              <dt>{formatAttributeLabel(key)}</dt>
-              <dd>{Array.isArray(value) ? value.join(', ') : value}</dd>
-            </React.Fragment>
-          );
-        })}
-      </dl>
-    </div>
+          <Box component="div" mb={2}>
+            <Typography component="dt" variant="body2" fontWeight="bold">
+              Died
+            </Typography>
+            <Typography component="dd" variant="body2" ml={2} color="text.secondary">
+              {dd ? `${formatDate(dd)}${dp ? ` in ${dp}` : ''}` : '-'}
+            </Typography>
+          </Box>
+
+          {/* Other Attributes */}
+          {Object.entries(ATTRIBUTE_LABELS).map(([key]) => {
+            let value = attributes[key];
+            if (!value) return null;
+            if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+              try { value = JSON.parse(value); } catch {}
+            }
+            return (
+              <Box component="div" key={key} mb={2}>
+                <Typography component="dt" variant="body2" fontWeight="bold">
+                  {formatAttributeLabel(key)}
+                </Typography>
+                <Typography component="dd" variant="body2" ml={2} color="text.secondary">
+                  {Array.isArray(value) ? value.join(', ') : value}
+                </Typography>
+              </Box>
+            );
+          })}
+        </Box>
+      </Box>
+    </Box>
   );
 };
 

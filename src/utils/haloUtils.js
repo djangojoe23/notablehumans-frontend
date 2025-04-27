@@ -38,10 +38,24 @@ export function updateHaloForFeature(map, feature, globeState) {
 
   // animate pulsing
   let direction = 1;
-  function animate() {
+  let lastTimestamp = null;
+  function animate(timestamp) {
+    if (!lastTimestamp) lastTimestamp = timestamp;
+    const elapsed = timestamp - lastTimestamp;
+    lastTimestamp = timestamp;
+
     let { pulseOffset } = haloFeature.properties;
-    pulseOffset += direction * 0.2;
-    if (pulseOffset > baseRadius || pulseOffset < 0) direction *= -1;
+    pulseOffset += direction * (elapsed / 1000) * 20; // 40 units per second
+
+    if (pulseOffset > baseRadius) {
+      pulseOffset = baseRadius;
+      direction = -1;
+    }
+    if (pulseOffset < 0) {
+      pulseOffset = 0;
+      direction = 1;
+    }
+
     haloFeature.properties.pulseOffset = pulseOffset;
 
     map.getSource('halo').setData({
@@ -49,18 +63,15 @@ export function updateHaloForFeature(map, feature, globeState) {
       features: [haloFeature]
     });
 
-    // **SYNC** the sidebar pulse
     const ratio = pulseOffset / baseRadius;
-    document.documentElement.style.setProperty(
-      '--pulse-ratio',
-      ratio
-    );
+    document.documentElement.style.setProperty('--pulse-ratio', ratio);
 
     haloAnimationFrameRef.current = requestAnimationFrame(animate);
   }
 
+
   isHaloActiveRef.current = true;
-  animate();
+  haloAnimationFrameRef.current = requestAnimationFrame(animate);
 }
 
 /**

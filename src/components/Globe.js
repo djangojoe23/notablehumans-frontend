@@ -1,4 +1,5 @@
 import React, {useEffect, useRef} from 'react';
+import { Box } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
@@ -259,13 +260,18 @@ const Globe = (globeState) => {
   }, [globeState.sortBy, globeState.sortAsc]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '100%' }}>
-      <div
+    <Box position="relative" width="100%" height="100%">
+      <Box
         ref={containerRef}
-        style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 }}
+        position="absolute"
+        top={0}
+        left={0}
+        right={0}
+        bottom={0}
       />
-    </div>
+    </Box>
   );
+
 };
 
 export default Globe;

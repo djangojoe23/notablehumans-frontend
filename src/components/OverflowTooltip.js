@@ -1,7 +1,8 @@
-import React, { useRef, useState, useEffect } from "react";
+import React, { useRef, useState, useEffect } from 'react';
+import { Tooltip, Box } from '@mui/material';
 
 /**
- * Renders children with an automatic tooltip if the content is truncated.
+ * Renders children with an automatic MUI Tooltip if the content is truncated.
  */
 const OverflowTooltip = ({ children, tooltipText }) => {
   const textRef = useRef(null);
@@ -14,11 +15,10 @@ const OverflowTooltip = ({ children, tooltipText }) => {
     }
   }, [children]);
 
-  return (
-    <div
+  const content = (
+    <Box
       ref={textRef}
-      title={isTruncated ? tooltipText : ''}
-      style={{
+      sx={{
         whiteSpace: 'nowrap',
         overflow: 'hidden',
         textOverflow: 'ellipsis',
@@ -27,7 +27,15 @@ const OverflowTooltip = ({ children, tooltipText }) => {
       }}
     >
       {children}
-    </div>
+    </Box>
+  );
+
+  return isTruncated ? (
+    <Tooltip title={tooltipText} arrow placement="top">
+      <span>{content}</span>
+    </Tooltip>
+  ) : (
+    content
   );
 };
 

@@ -1,27 +1,70 @@
 // haloUtils.js
-// Uses Mapbox's built-in clustering + getClusterLeaves to halo the correct marker for a human
+// Manages pulsing halo animations independently from Mapbox's rendering optimizations.
+
+let globalPulseAnimationFrame = null;
+let pulseOffset = 0;
+let pulseDirection = 1;
+let lastPulseTimestamp = null;
 
 /**
- * Draw and animate a pulsing halo around a GeoJSON point feature on the map.
+ * Starts a global pulse loop to drive both halo size and sidebar animations.
+ */
+function startGlobalPulseLoop() {
+  if (globalPulseAnimationFrame) return; // Already running
+
+  const animate = (timestamp) => {
+    if (!lastPulseTimestamp) lastPulseTimestamp = timestamp;
+    const elapsed = timestamp - lastPulseTimestamp;
+    lastPulseTimestamp = timestamp;
+
+    pulseOffset += pulseDirection * (elapsed / 1000);
+
+    if (pulseOffset > 1) {
+      pulseOffset = 1;
+      pulseDirection = -1;
+    } else if (pulseOffset < 0) {
+      pulseOffset = 0;
+      pulseDirection = 1;
+    }
+
+    // Update CSS variable for sidebar/detail panel pulsing
+    document.documentElement.style.setProperty('--pulse-ratio', pulseOffset);
+
+    globalPulseAnimationFrame = requestAnimationFrame(animate);
+  };
+
+  globalPulseAnimationFrame = requestAnimationFrame(animate);
+}
+
+/**
+ * Stops the global pulse loop (optional cleanup if needed).
+ */
+function stopGlobalPulseLoop() {
+  if (globalPulseAnimationFrame) {
+    cancelAnimationFrame(globalPulseAnimationFrame);
+    globalPulseAnimationFrame = null;
+    lastPulseTimestamp = null;
+  }
+}
+
+/**
+ * Draws and animates a pulsing halo around a GeoJSON point feature on the map.
  * @param {mapboxgl.Map} map
  * @param {GeoJSON.Feature<Point>} feature
  * @param {object} globeState
  */
 export function updateHaloForFeature(map, feature, globeState) {
-  const {
-    haloAnimationFrameRef,
-    isHaloActiveRef,
-    currentHaloFeatureRef
-  } = globeState;
+  const { haloAnimationFrameRef, isHaloActiveRef, currentHaloFeatureRef } = globeState;
 
-  // cancel previous animation
+  // Cancel any previous halo-specific animation
   if (haloAnimationFrameRef.current) {
     cancelAnimationFrame(haloAnimationFrameRef.current);
   }
-  isHaloActiveRef.current = false;
 
-  // initial halo geometry and properties
+  isHaloActiveRef.current = true;
+
   const { baseRadius = 15 } = feature.properties || {};
+
   const haloFeature = {
     type: 'Feature',
     id: feature.id,
@@ -29,58 +72,41 @@ export function updateHaloForFeature(map, feature, globeState) {
     properties: { baseRadius, pulseOffset: 0 }
   };
 
-  // set the GeoJSON data on the 'halo' source
   map.getSource('halo').setData({
     type: 'FeatureCollection',
     features: [haloFeature]
   });
+
   currentHaloFeatureRef.current = haloFeature;
 
-  // animate pulsing
-  let direction = 1;
-  let lastTimestamp = null;
-  function animate(timestamp) {
-    if (!lastTimestamp) lastTimestamp = timestamp;
-    const elapsed = timestamp - lastTimestamp;
-    lastTimestamp = timestamp;
+  // Keep syncing halo feature with global pulse loop
+  function syncHalo() {
+    if (!isHaloActiveRef.current) return;
 
-    let { pulseOffset } = haloFeature.properties;
-    pulseOffset += direction * (elapsed / 1000) * 20; // 40 units per second
-
-    if (pulseOffset > baseRadius) {
-      pulseOffset = baseRadius;
-      direction = -1;
-    }
-    if (pulseOffset < 0) {
-      pulseOffset = 0;
-      direction = 1;
-    }
-
-    haloFeature.properties.pulseOffset = pulseOffset;
+    const currentPulseRatio = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--pulse-ratio')) || 0;
+    haloFeature.properties.pulseOffset = baseRadius * currentPulseRatio;
 
     map.getSource('halo').setData({
       type: 'FeatureCollection',
       features: [haloFeature]
     });
 
-    const ratio = pulseOffset / baseRadius;
-    document.documentElement.style.setProperty('--pulse-ratio', ratio);
-
-    haloAnimationFrameRef.current = requestAnimationFrame(animate);
+    haloAnimationFrameRef.current = requestAnimationFrame(syncHalo);
   }
 
+  haloAnimationFrameRef.current = requestAnimationFrame(syncHalo);
 
-  isHaloActiveRef.current = true;
-  haloAnimationFrameRef.current = requestAnimationFrame(animate);
+  // Make sure the global pulse loop is running
+  startGlobalPulseLoop();
 }
 
 /**
- * Use Mapbox's clustering to find which cluster contains a given human,
- * then halo that cluster marker (or the raw point if unclustered).
+ * Uses Mapbox's clustering to find which cluster contains a given human,
+ * then halos that cluster marker (or the raw point if unclustered).
  * @param {mapboxgl.Map} map
  * @param {{id: string, lng: string|number, lat: string|number}} human
  * @param {object} globeState
- * @returns {Promise<string|null>} cluster_id or null for individual
+ * @returns {Promise<string|null>} Cluster ID or null
  */
 export async function updateHaloForDetailedHuman(map, human, globeState) {
   if (!map || !human) return null;
@@ -88,24 +114,21 @@ export async function updateHaloForDetailedHuman(map, human, globeState) {
   const lng = parseFloat(human.lng);
   const lat = parseFloat(human.lat);
 
-  // clear any existing halo animation
+  // Cancel any previous halo animation
   if (globeState.haloAnimationFrameRef.current) {
     cancelAnimationFrame(globeState.haloAnimationFrameRef.current);
     globeState.isHaloActiveRef.current = false;
   }
 
-  // buffer in pixels around the projected point to find nearby clusters
+  // Search nearby clusters
   const pixel = map.project([lng, lat]);
   const buffer = 50;
   const bbox = [
     [pixel.x - buffer, pixel.y - buffer],
     [pixel.x + buffer, pixel.y + buffer]
   ];
-
-  // query rendered cluster circles in view around this human
   const clusters = map.queryRenderedFeatures(bbox, { layers: ['clusters'] });
 
-  // check each cluster to see if it contains our human
   for (const cluster of clusters) {
     const clusterId = cluster.properties.cluster_id;
     const leaves = await new Promise((resolve, reject) => {
@@ -115,16 +138,14 @@ export async function updateHaloForDetailedHuman(map, human, globeState) {
       });
     });
     if (leaves.find(leaf => leaf.properties.id === human.id)) {
-      // decide baseRadius by cluster size
       const count = cluster.properties.point_count;
       const baseRadius = count >= 30 ? 25 : count >= 10 ? 20 : 15;
 
-      // halo exactly at the cluster's center coordinate
       const featureForHalo = {
         type: 'Feature',
         id: clusterId,
         geometry: { type: 'Point', coordinates: cluster.geometry.coordinates },
-        properties: { baseRadius: baseRadius }
+        properties: { baseRadius }
       };
 
       updateHaloForFeature(map, featureForHalo, globeState);
@@ -132,7 +153,7 @@ export async function updateHaloForDetailedHuman(map, human, globeState) {
     }
   }
 
-  // fallback: unclustered point
+  // Fallback to unclustered
   const fallbackFeature = {
     type: 'Feature',
     id: human.id,

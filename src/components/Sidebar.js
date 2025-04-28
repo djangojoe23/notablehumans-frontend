@@ -1,32 +1,20 @@
 import React, { useEffect, useMemo, useRef } from 'react';
 import { Box, Paper, Typography, ListItem, ListItemText, IconButton } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VariableSizeList as VirtualList } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 
-import { SIDEBAR_WIDTH, BUTTON_SIZE, ARROW_SIZE } from '../constants/layout';
-import { sortHumansComparator } from '../utils/sortHumans';
+import { SIDEBAR_WIDTH, BUTTON_SIZE } from '../constants/layout';
 import { formatYear } from '../utils/format';
 import OverflowTooltip from './OverflowTooltip';
 import HumanDetail from './HumanDetail';
-import SortControls from './SortControls';
+import Filter from './Filter';
 
 
-const Sidebar = (globeState) => {
+const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
   const listRef = useRef(null);
-
-  const sortedHumans = useMemo(() => {
-    const features = globeState.notableHumanData?.features ?? [];
-    const humans = features.map((f) => ({
-      ...f.properties,
-      lat: f.geometry.coordinates[1],
-      lng: f.geometry.coordinates[0],
-    }));
-    return [...humans].sort(sortHumansComparator(globeState.sortBy, globeState.sortAsc));
-  }, [globeState.notableHumanData, globeState.sortBy, globeState.sortAsc]);
 
   const getItemSize = () => 36; // fixed row height for now
 
@@ -44,7 +32,7 @@ const Sidebar = (globeState) => {
   };
 
   const renderRow = ({ index, style }) => {
-    const human = sortedHumans[index];
+    const human = notableHumans[index];
     const isSelected = human.id === globeState.detailedHuman?.id;
 
     return (
@@ -66,7 +54,7 @@ const Sidebar = (globeState) => {
           '&:hover': {
             backgroundColor: 'rgba(0, 0, 0, 0.06)',
           },
-          borderBottom: index < sortedHumans.length - 1 ? '1px solid #e0e0e0' : 'none',
+          borderBottom: index < notableHumans.length - 1 ? '1px solid #e0e0e0' : 'none',
           cursor: 'pointer',
         }}
       >
@@ -135,16 +123,16 @@ const Sidebar = (globeState) => {
     const open = globeState.sidebarOpen;
     if (!detailed || !open || !listRef.current) return;
 
-    const index = sortedHumans.findIndex((h) => h.id === detailed.id);
+    const index = notableHumans.findIndex((h) => h.id === detailed.id);
     if (index !== -1) {
       setTimeout(() => {
         listRef.current.scrollToItem(index, 'auto');
       }, 300);
     }
-  }, [globeState.detailedHuman, globeState.sidebarOpen, sortedHumans]);
+  }, [globeState.detailedHuman, globeState.sidebarOpen, notableHumans]);
 
   const scrollToPerson = (person) => {
-    const index = sortedHumans.findIndex((h) => h.id === person.id);
+    const index = notableHumans.findIndex((h) => h.id === person.id);
     if (index !== -1 && listRef.current) {
       listRef.current.scrollToItem(index, 'auto');
     }
@@ -178,32 +166,48 @@ const Sidebar = (globeState) => {
       >
         <Box px={2} py={1}>
           <Typography variant="subtitle1" fontWeight="bold">
-            All Notable Humans ({sortedHumans.length})
+            All Notable Humans ({notableHumans.length})
           </Typography>
         </Box>
 
-        {sortedHumans.length > 0 && (
-          <SortControls
-            sortBy={globeState.sortBy}
-            setSortBy={globeState.setSortBy}
-            sortAsc={globeState.sortAsc}
-            setSortAsc={globeState.setSortAsc}
+          <Filter
+            sortBy={filters.sortBy}
+            setSortBy={filters.setSortBy}
+            sortAsc={filters.sortAsc}
+            setSortAsc={filters.setSortAsc}
+            searchQuery={filters.searchQuery}
+            setSearchQuery={filters.setSearchQuery}
           />
-        )}
 
         <Box display="flex" flexDirection="column" flex={1} minHeight={0}>
           <Box flex={1} minHeight={0}>
             <AutoSizer>
               {({ height, width }) => (
+              notableHumans.length > 0 ? (
+
                 <VirtualList
                   ref={listRef}
                   height={height}
-                  itemCount={sortedHumans.length}
+                  itemCount={notableHumans.length}
                   itemSize={getItemSize}
                   width={width}
                 >
                   {renderRow}
                 </VirtualList>
+                  ) : (
+                  <Box
+                    height={height}
+                    width={width}
+                    display="flex"
+                    alignItems="center"
+                    justifyContent="center"
+                    p={2}
+                  >
+                    <Typography variant="body2" color="textSecondary" align="center">
+                      No humans found matching your filters.
+                    </Typography>
+                  </Box>
+                )
               )}
             </AutoSizer>
           </Box>

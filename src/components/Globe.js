@@ -5,10 +5,24 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 
 import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
 import updateClusterVisualStates from "../utils/updateClusterVisualStates";
-import { updateHaloForDetailedHuman} from '../utils/haloUtils';
+import { updateHaloForDetailedHuman, activateHaloForUnclustered} from '../utils/haloUtils';
 import { buildClusterPopup } from '../utils/clusterPopup';
 
-const Globe = (globeState) => {
+const buildFilteredGeoJSON = (notableHumans) => ({
+  type: 'FeatureCollection',
+  features: notableHumans.map(person => ({
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: [person.lng, person.lat],
+    },
+    properties: {
+      ...person,
+    },
+  })),
+});
+
+const Globe = ({ notableHumans = [], filters, ...globeState }) => {
   const containerRef = useRef(null);
   const popupRef = useRef(null);
   const clusterWithPopupRef = useRef({ clusterId: null, lngLat: null, totalCount: 0 });
@@ -154,12 +168,13 @@ const Globe = (globeState) => {
         };
 
         globeState.justClickedUnclusteredRef.current = true;
-
         globeState.setDetailedHuman(human);
+
         if (!globeState.sidebarOpenRef.current) {
           globeState.setSidebarOpen(true);
         }
-
+        // Activate halo immediately for better click responsiveness
+        activateHaloForUnclustered(globe, feature, globeState);
       });
 
       globe.on('click', 'clusters', (e) => {
@@ -177,7 +192,9 @@ const Globe = (globeState) => {
           popupRef,
           clusterId,
           lngLat,
-          totalCount
+          totalCount,
+          filters.sortBy,
+          filters.sortAsc
         );
       });
     });
@@ -197,7 +214,19 @@ const Globe = (globeState) => {
     sidebarOpen: globeState.sidebarOpen,
   });
 
-// When a human is selected in sidebar: fly, halo, and keep synced on zoom/pan
+  useEffect(() => {
+    const globe = globeState.globeRef.current;
+    if (!globe) return;
+
+    const source = globe.getSource('humans');
+    if (!source) return;
+
+    const filteredGeoJSON = buildFilteredGeoJSON(notableHumans);
+    source.setData(filteredGeoJSON);
+  }, [notableHumans]);
+
+
+  // When a human is selected in sidebar: fly, halo, and keep synced on zoom/pan
   useEffect(() => {
     const map = globeState.globeRef.current;
     const human = globeState.detailedHuman;

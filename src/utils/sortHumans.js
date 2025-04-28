@@ -20,15 +20,41 @@ export const sortHumansComparator = (sortBy, sortAsc) => (a, b) => {
         ? (a.n || '').localeCompare(b.n || '')
         : (b.n || '').localeCompare(a.n || '');
     case 'bd': {
-      return compareISO('bd')
+      const aYear = a.by;
+      const bYear = b.by;
+
+      // missing birth years go last
+      if (aYear == null && bYear == null) return 0;
+      if (aYear == null) return 1 * m;
+      if (bYear == null) return -1 * m;
+
+      if (aYear !== bYear) {
+        return (aYear - bYear) * m;
+      }
+
+      // same birth year — break tie with full birth date
+      return compareISO('bd');
     }
     case 'dd': {
-       // sort by death date, but if neither died, fall back to birth date
-      const aD = a.dd, bD = b.dd
-      if (!aD && bD) return  1 * m
-      if (aD && !bD) return -1 * m
-      if (!aD && !bD) return compareISO('bd')
-      return compareISO('dd')
+      const aDeathYear = a.dy ?? null;
+      const bDeathYear = b.dy ?? null;
+
+      const aSortYear = aDeathYear ?? a.by ?? null;
+      const bSortYear = bDeathYear ?? b.by ?? null;
+
+      if (aSortYear == null && bSortYear == null) return 0;
+      if (aSortYear == null) return 1 * m;
+      if (bSortYear == null) return -1 * m;
+
+      if (aSortYear !== bSortYear) {
+        return (aSortYear - bSortYear) * m;
+      }
+
+      // If years are same, fall back to comparing full death dates if available
+      if (a.dd && b.dd) return compareISO('dd');
+
+      // If no death date, fallback to birth date
+      return compareISO('bd');
     }
     case 'al': // article length
     case 'rv': // recent views

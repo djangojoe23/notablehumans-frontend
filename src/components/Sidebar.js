@@ -22,14 +22,22 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
     const globe = globeState.globeRef.current;
     if (!globe) return;
 
+    // If clicking the already selected human, deselect
+    if (globeState.detailedHuman?.id === human.id) {
+    globeState.setDetailedHuman(null);
+    return;
+    }
+
+    // Otherwise, select new human and fly to them
     globe.flyTo({
-      center: [human.lng, human.lat],
-      zoom: globe.getZoom(),
-      essential: true,
+    center: [human.lng, human.lat],
+    zoom: globe.getZoom(),
+    essential: true,
     });
 
     globeState.setDetailedHuman(human);
   };
+
 
   const renderRow = ({ index, style }) => {
     const human = notableHumans[index];
@@ -60,8 +68,8 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
       >
         <ListItemText
           primary={
-            <OverflowTooltip tooltipText={`${human.n}${human.by != null ? ` (${formatYear(human.by)})` : ''}`}>
-              {human.n} {human.by != null ? `(${formatYear(human.by)})` : ''}
+            <OverflowTooltip tooltipText={`${human.n}${human.by != null ? ` (${formatYear(human.by)}` : ''} - ${human.dy != null ? ` ${formatYear(human.dy)})` : '?)'}`} >
+              {human.n} {human.by != null ? `(${formatYear(human.by)}` : ''} - {human.dy != null ? `${formatYear(human.dy)})` : '?)'}
             </OverflowTooltip>
           }
           sx={{
@@ -177,6 +185,16 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
             setSortAsc={filters.setSortAsc}
             searchQuery={filters.searchQuery}
             setSearchQuery={filters.setSearchQuery}
+            birthYearRange={filters.birthYearRange}
+            setBirthYearRange={filters.setBirthYearRange}
+          />
+
+          <Box
+              sx={{
+                borderTop: '1px solid',
+                borderColor: 'grey.300',
+                mt: 1,
+              }}
           />
 
         <Box display="flex" flexDirection="column" flex={1} minHeight={0}>

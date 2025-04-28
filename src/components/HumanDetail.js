@@ -67,10 +67,19 @@ return (
         </Typography>
 
         {description && (
-          <Typography variant="caption" color="text.secondary" noWrap sx={{ mb: 1 }}>
+          <Typography
+            variant="caption"
+            color="text.secondary"
+            sx={{
+              mb: 1,
+              wordBreak: 'break-word', // allow long words to break
+              overflowWrap: 'anywhere', // allow wrapping at any point if needed
+            }}
+          >
             {description}
           </Typography>
         )}
+
 
         {/* Icon Row - evenly distributed */}
         <Box

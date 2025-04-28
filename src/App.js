@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import axios from "axios";
 import { Box, Typography } from '@mui/material';
 
@@ -30,9 +30,11 @@ function App() {
         searchQuery, setSearchQuery,
         sortBy, setSortBy,
         sortAsc, setSortAsc,
+        birthYearRange, setBirthYearRange
     } = useFilterState();
 
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
+    const debouncedBirthYearRange = useDebouncedValue(birthYearRange, 300); // 300ms delay
 
     const notableHumans = useMemo(() => {
       if (!globeState.notableHumanData?.features) return [];
@@ -51,18 +53,29 @@ function App() {
         );
       }
 
+      humans = humans.filter(person => {
+          if (person.by == null) return true; // no birth year, keep
+
+          const minOk = debouncedBirthYearRange[0] == null || person.by >= debouncedBirthYearRange[0];
+          const maxOk = debouncedBirthYearRange[1] == null || person.by <= debouncedBirthYearRange[1];
+
+          return minOk && maxOk;
+      });
+
+
       const cmp = sortHumansComparator(sortBy, sortAsc);
       humans.sort((a, b) => cmp(a, b));
 
-
       return humans;
-    }, [globeState.notableHumanData, debouncedSearchQuery, sortBy, sortAsc]);
+    }, [globeState.notableHumanData, debouncedSearchQuery, sortBy, sortAsc, debouncedBirthYearRange]);
 
-    const filters = {
+    const filters = useMemo(() => ({
       searchQuery, setSearchQuery,
       sortBy, setSortBy,
       sortAsc, setSortAsc,
-    };
+      birthYearRange, setBirthYearRange,
+    }), [searchQuery, sortBy, sortAsc, birthYearRange, setSearchQuery, setSortBy, setSortAsc, setBirthYearRange]);
+
 
     if (globeState.dataLoadError) {
         return (

@@ -197,6 +197,35 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
           filters.sortAsc
         );
       });
+
+      globe.on('click', (e) => {
+        const features = globe.queryRenderedFeatures(e.point, {
+          layers: ['clusters', 'unclustered-point'],
+        });
+
+        if (features.length === 0 && popupRef.current) {
+          // Clicked on empty map, not on cluster or unclustered point
+          popupRef.current.remove();
+          popupRef.current = null;
+          clusterWithPopupRef.current = { clusterId: null, lngLat: null, totalCount: 0 };
+        }
+      });
+
+      globe.on('mouseenter', 'clusters', () => {
+        globe.getCanvas().style.cursor = 'pointer';
+      });
+
+      globe.on('mouseleave', 'clusters', () => {
+        globe.getCanvas().style.cursor = '';
+      });
+
+      globe.on('mouseenter', 'unclustered-point', () => {
+        globe.getCanvas().style.cursor = 'pointer';
+      });
+
+      globe.on('mouseleave', 'unclustered-point', () => {
+        globe.getCanvas().style.cursor = '';
+      });
     });
 
     const handleResize = () => globe.resize();
@@ -223,6 +252,34 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
 
     const filteredGeoJSON = buildFilteredGeoJSON(notableHumans);
     source.setData(filteredGeoJSON);
+  }, [notableHumans]);
+
+  useEffect(() => {
+    if (popupRef.current) {
+      popupRef.current.remove();
+      popupRef.current = null;
+      clusterWithPopupRef.current = { clusterId: null, lngLat: null, totalCount: 0 };
+    }
+  }, [notableHumans]);
+
+  useEffect(() => {
+    const human = globeState.detailedHuman;
+    if (!human) return;
+
+    const stillExists = notableHumans.some(h => h.id === human.id);
+
+    if (!stillExists) {
+      globeState.setDetailedHuman(null);
+
+      // Also clean up halo manually if needed (already happens inside useEffect cleanup, but extra safe)
+      const globe = globeState.globeRef.current;
+      if (globe) {
+        const haloSource = globe.getSource('halo');
+        if (haloSource) {
+          haloSource.setData({ type: 'FeatureCollection', features: [] });
+        }
+      }
+    }
   }, [notableHumans]);
 
 

@@ -1,37 +1,45 @@
-// components/Filter.js
+// Updated components/Filter.js
 import React from 'react';
-import { Box, Grid, TextField, Stack, FormControl, InputLabel, Select, MenuItem, ToggleButtonGroup, ToggleButton, Typography } from '@mui/material';
+import {
+  Box,
+  Stack,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton,
+  Typography
+} from '@mui/material';
 import { ArrowUpward, ArrowDownward } from '@mui/icons-material';
 
 const Filter = ({
-  sortBy, setSortBy,
-  sortAsc, setSortAsc,
-  searchQuery, setSearchQuery,
-  birthYearRange, setBirthYearRange,
-  minBirthMonth, setMinBirthMonth,
-  minBirthDay, setMinBirthDay,
-  maxBirthMonth, setMaxBirthMonth,
-  maxBirthDay, setMaxBirthDay
+  sortBy,
+  setSortBy,
+  sortAsc,
+  setSortAsc,
+  searchQuery,
+  setSearchQuery,
+  birthYearRange = [null, null],
+  setBirthYearRange,
+  minBirthMonth,
+  setMinBirthMonth,
+  minBirthDay,
+  setMinBirthDay,
+  yearRange = null,
+  setYearRange
 }) => {
-
   const handleSortDirectionChange = (_, newDirection) => {
-    if (newDirection !== null) {
-      setSortAsc(newDirection === 'asc');
-    }
+    if (newDirection !== null) setSortAsc(newDirection === 'asc');
   };
 
-  const abbreviatedMonths = [
-    '', // 0 = "Any"
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
-  ];
-
+  const abbreviatedMonths = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
   return (
-    <Box sx={{ p: 2 }}>
-      <Stack spacing={1.5}>
-
-        {/* Search */}
+    <Box sx={{ p: 2, pb: 0 }}>
+      <Stack spacing={2}>
+        {/* Search by Name */}
         <TextField
           label="Search by Name"
           variant="outlined"
@@ -41,175 +49,123 @@ const Filter = ({
           fullWidth
         />
 
-        {/* Birth Date Range */}
-        <Box sx={{ mb: 2 }}>
-          <Stack direction="row" spacing={2} alignItems="flex-start">
-            {/* ── MIN COLUMN ── */}
-            <Box sx={{ flex: 1 }}>
-              <Stack spacing={1}>
-                {/* month + day */}
-                <Stack direction="row" spacing={1}>
-                  <FormControl size="small" variant="outlined" fullWidth>
-                    <InputLabel shrink id="min-month-label">Min Birth Month</InputLabel>
-                    <Select
-                      labelId="min-month-label"
-                      value={minBirthMonth ?? ''}
-                      label="Min Birth Month"
-                      onChange={e => setMinBirthMonth(
-                        e.target.value === '' ? null : parseInt(e.target.value, 10)
-                      )}
-                      displayEmpty
-                    >
-                      <MenuItem value="">Any</MenuItem>
-                      {abbreviatedMonths.slice(1).map((m, i) =>
-                        <MenuItem key={i+1} value={i+1}>{m}</MenuItem>
-                      )}
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel id="min-day-label">Min Day</InputLabel>
-                    <Select
-                      labelId="min-day-label"
-                      value={minBirthDay ?? ''}
-                      label="Min Day"
-                      onChange={e => setMinBirthDay(
-                        e.target.value === '' ? null : parseInt(e.target.value, 10)
-                      )}
-                    >
-                      <MenuItem value="">Any</MenuItem>
-                      {[...Array(31)].map((_, i) =>
-                        <MenuItem key={i+1} value={i+1}>{i+1}</MenuItem>
-                      )}
-                    </Select>
-                  </FormControl>
-                </Stack>
-
-                {/* year */}
-                <TextField
-                  label="Min Birth Year"
-                  variant="outlined"
-                  size="small"
-                  type="number"
-                  value={birthYearRange[0] ?? ''}
-                  onChange={e => {
-                    const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                    if (!isNaN(v) || v === null) setBirthYearRange([v, birthYearRange[1]]);
-                  }}
-                  fullWidth
-                />
-              </Stack>
-            </Box>
-
-            {/* ── MAX COLUMN ── */}
-            <Box sx={{ flex: 1 }}>
-              <Stack spacing={1}>
-                {/* month + day */}
-                <Stack direction="row" spacing={1}>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel id="max-month-label">Max Month</InputLabel>
-                    <Select
-                      labelId="max-month-label"
-                      value={maxBirthMonth ?? ''}
-                      label="Max Month"
-                      onChange={e => setMaxBirthMonth(
-                        e.target.value === '' ? null : parseInt(e.target.value, 10)
-                      )}
-                    >
-                      <MenuItem value="">Any</MenuItem>
-                      {abbreviatedMonths.slice(1).map((m, i) =>
-                        <MenuItem key={i+1} value={i+1}>{m}</MenuItem>
-                      )}
-                    </Select>
-                  </FormControl>
-                  <FormControl size="small" fullWidth>
-                    <InputLabel id="max-day-label">Max Day</InputLabel>
-                    <Select
-                      labelId="max-day-label"
-                      value={maxBirthDay ?? ''}
-                      label="Max Day"
-                      onChange={e => setMaxBirthDay(
-                        e.target.value === '' ? null : parseInt(e.target.value, 10)
-                      )}
-                    >
-                      <MenuItem value="">Any</MenuItem>
-                      {[...Array(31)].map((_, i) =>
-                        <MenuItem key={i+1} value={i+1}>{i+1}</MenuItem>
-                      )}
-                    </Select>
-                  </FormControl>
-                </Stack>
-
-                {/* year */}
-                <TextField
-                  label="Max Birth Year"
-                  variant="outlined"
-                  size="small"
-                  type="number"
-                  value={birthYearRange[1] ?? ''}
-                  onChange={e => {
-                    const v = e.target.value === '' ? null : parseInt(e.target.value, 10);
-                    if (!isNaN(v) || v === null) setBirthYearRange([birthYearRange[0], v]);
-                  }}
-                  fullWidth
-                />
-              </Stack>
-            </Box>
-          </Stack>
-
-          {/* error */}
-          {birthYearRange[0] != null &&
-           birthYearRange[1] != null &&
-           birthYearRange[0] > birthYearRange[1] && (
-            <Typography variant="caption" color="error" align="center" display="block" mt={1}>
-              Min year must be ≤ Max year
-            </Typography>
-          )}
-        </Box>
-
-
-        {/* Sort By + Sort Direction Row */}
-        <Stack direction="row" spacing={1} alignItems="center">
-          <FormControl size="small" fullWidth>
-            <InputLabel id="sort-by-label">Sort By</InputLabel>
-            <Select
-              labelId="sort-by-label"
-              id="sort-by"
-              value={sortBy}
-              label="Sort By"
-              onChange={(e) => setSortBy(e.target.value)}
-            >
-              <MenuItem value="n">Name</MenuItem>
-              <MenuItem value="bd">Birth Date</MenuItem>
-              <MenuItem value="dd">Death Date</MenuItem>
-              <MenuItem value="cd">Wikipedia Created Date</MenuItem>
-              <MenuItem value="al">Wikipedia Article Length</MenuItem>
-              <MenuItem value="rv">Wikipedia Recent Views</MenuItem>
-              <MenuItem value="te">Wikipedia Total Edits</MenuItem>
-            </Select>
-          </FormControl>
-
-          <ToggleButtonGroup
-            value={sortAsc ? 'asc' : 'desc'}
-            exclusive
-            onChange={handleSortDirectionChange}
-            size="small"
-            color="primary"
+        {/* Birth Date and Years Since Sections */}
+        <Box sx={{ display: 'flex', gap: 0 }}>
+          {/* Birth Date Fieldset */}
+          <Box
+            component="fieldset"
             sx={{
-              flexShrink: 0,
-              ml: 1,
-              height: '40px',
-              alignSelf: 'center',
+              flex: 1,
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 1,
+              '& legend': { fontSize: '0.875rem', fontWeight: 500 }
             }}
           >
-            <ToggleButton value="asc" aria-label="Ascending">
-              <ArrowUpward fontSize="small" />
-            </ToggleButton>
-            <ToggleButton value="desc" aria-label="Descending">
-              <ArrowDownward fontSize="small" />
-            </ToggleButton>
-          </ToggleButtonGroup>
-        </Stack>
+            <Box component="legend">Born On</Box>
+            <Box sx={{ display: 'flex', gap: .5 }}>
+              {/* Month */}
+              <FormControl fullWidth size="small">
+                <Select
+                  displayEmpty
+                  value={minBirthMonth ?? ''}
+                  onChange={e => setMinBirthMonth(e.target.value === '' ? null : +e.target.value)}
+                >
+                  <MenuItem value=""><em>Mo.</em></MenuItem>
+                  {abbreviatedMonths.slice(1).map((m, i) => (
+                    <MenuItem key={i+1} value={i+1}>{m}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {/* Day */}
+              <FormControl fullWidth size="small">
+                <Select
+                  displayEmpty
+                  value={minBirthDay ?? ''}
+                  onChange={e => setMinBirthDay(e.target.value === '' ? null : +e.target.value)}
+                >
+                  <MenuItem value=""><em>Day</em></MenuItem>
+                  {[...Array(31)].map((_, i) => (
+                    <MenuItem key={i+1} value={i+1}>{i+1}</MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              {/* Year */}
+              <TextField
+                placeholder="Year"
+                variant="outlined"
+                size="small"
+                type="number"
+                value=""
+                onChange={e => {
+                  const v = e.target.value === '' ? null : +e.target.value;
+                  if (setBirthYearRange) setBirthYearRange([v, birthYearRange?.[1] ?? null]);
+                }}
+                fullWidth
+                sx={{ '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]': { MozAppearance: 'textfield' } }}
+              />
+            </Box>
+          </Box>
 
+          {/* Years Since Fieldset */}
+          <Box
+            component="fieldset"
+            sx={{
+              width: '100px',
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 1,
+              '& legend': { fontSize: '0.85rem', fontWeight: 500 }
+            }}
+          >
+            <Box component="legend">Or Within Next</Box>
+            <TextField
+              placeholder="0"
+              variant="outlined"
+              size="small"
+              type="number"
+              value={yearRange ?? ''}
+              onChange={e => setYearRange && setYearRange(e.target.value === '' ? null : +e.target.value)}
+              fullWidth
+              slotProps={{
+                input: {
+                  endAdornment: <InputAdornment position="end">yrs</InputAdornment>
+                }
+              }}
+              sx={{ '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]': { MozAppearance: 'textfield' } }}
+            />
+          </Box>
+        </Box>
+
+        {/* Sort Options Fieldset */}
+        <Box component="fieldset" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1, '& legend': { fontSize: '0.875rem', fontWeight: 500 } }}>
+          <Box component="legend">Sort By</Box>
+          <Stack direction="row" spacing={1} alignItems="center">
+            <FormControl fullWidth size="small">
+              <Select value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                <MenuItem value="n">Name</MenuItem>
+                <MenuItem value="bd">Birth Date</MenuItem>
+                <MenuItem value="dd">Death Date</MenuItem>
+                <MenuItem value="cd">Wikipedia Created Date</MenuItem>
+                <MenuItem value="al">Wikipedia Article Length</MenuItem>
+                <MenuItem value="rv">Wikipedia Recent Views</MenuItem>
+                <MenuItem value="te">Wikipedia Total Edits</MenuItem>
+              </Select>
+            </FormControl>
+            <ToggleButtonGroup
+              value={sortAsc ? 'asc' : 'desc'}
+              exclusive
+              onChange={handleSortDirectionChange}
+              size="small"
+              color="primary"
+            >
+              <ToggleButton value="asc"><ArrowUpward fontSize="small"/></ToggleButton>
+              <ToggleButton value="desc"><ArrowDownward fontSize="small"/></ToggleButton>
+            </ToggleButtonGroup>
+          </Stack>
+        </Box>
       </Stack>
     </Box>
   );

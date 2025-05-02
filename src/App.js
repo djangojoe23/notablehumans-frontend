@@ -27,55 +27,102 @@ function App() {
     }, []);
 
     const {
-        searchQuery, setSearchQuery,
-        sortBy, setSortBy,
-        sortAsc, setSortAsc,
-        birthYearRange, setBirthYearRange
-    } = useFilterState();
+        searchQuery,    setSearchQuery,
+        sortBy,         setSortBy,
+        sortAsc,        setSortAsc,
+        birthYearRange, setBirthYearRange,
+        minBirthMonth,  setMinBirthMonth,
+        minBirthDay,    setMinBirthDay,
+        maxBirthMonth,  setMaxBirthMonth,
+        maxBirthDay,    setMaxBirthDay,
+      } = useFilterState();
 
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
     const debouncedBirthYearRange = useDebouncedValue(birthYearRange, 300); // 300ms delay
 
     const notableHumans = useMemo(() => {
-      if (!globeState.notableHumanData?.features) return [];
+        if (!globeState.notableHumanData?.features) return [];
 
-      let humans = globeState.notableHumanData.features.map(f => ({
-        ...f.properties,
-        lng: f.geometry.coordinates[0],
-        lat: f.geometry.coordinates[1],
-      }));
+        // map GeoJSON → flat array
+        let humans = globeState.notableHumanData.features.map(f => ({
+          ...f.properties,
+          lng: f.geometry.coordinates[0],
+          lat: f.geometry.coordinates[1],
+        }));
 
+        // 1) Search‐by‐name
+        if (debouncedSearchQuery.trim()) {
+          const q = debouncedSearchQuery.toLowerCase();
+          humans = humans.filter(h =>
+            h.n?.toLowerCase().includes(q)
+          );
+        }
 
-      if (debouncedSearchQuery.trim()) {
-        const lowerQuery = searchQuery.toLowerCase();
-        humans = humans.filter(person =>
-          person.n?.toLowerCase().includes(lowerQuery)
-        );
-      }
+        // 2) Date‐of‐birth filtering: year, then month/day
+        const [minY, maxY] = debouncedBirthYearRange;
+        humans = humans.filter(h => {
+          // parse a full birth‐date if available, or fallback to year only
+          let year = h.by;
+          let month = null;
+          let day = null;
 
-      humans = humans.filter(person => {
-          if (person.by == null) return true; // no birth year, keep
+          if (h.bd) {
+            [ year, month, day ] = h.bd
+              .split('-')
+              .map(num => parseInt(num, 10));
+          }
 
-          const minOk = debouncedBirthYearRange[0] == null || person.by >= debouncedBirthYearRange[0];
-          const maxOk = debouncedBirthYearRange[1] == null || person.by <= debouncedBirthYearRange[1];
+          // Year check
+          if (minY != null && year < minY) return false;
+          if (maxY != null && year > maxY) return false;
 
-          return minOk && maxOk;
-      });
+          // Month check
+          if (minBirthMonth != null) {
+            // if no month available, exclude
+            if (month == null) return false;
+            if (month < minBirthMonth) return false;
+            // if same month, check day
+            if (month === minBirthMonth && minBirthDay != null && day < minBirthDay) {
+              return false;
+            }
+          }
+          if (maxBirthMonth != null) {
+            if (month == null) return false;
+            if (month > maxBirthMonth) return false;
+            if (month === maxBirthMonth && maxBirthDay != null && day > maxBirthDay) {
+              return false;
+            }
+          }
 
+          return true;
+        });
 
-      const cmp = sortHumansComparator(sortBy, sortAsc);
-      humans.sort((a, b) => cmp(a, b));
+        // 3) Sort
+        humans.sort(sortHumansComparator(sortBy, sortAsc));
+        return humans;
+      }, [
+        globeState.notableHumanData,
+        debouncedSearchQuery,
+        debouncedBirthYearRange,
+        sortBy, sortAsc,
+        minBirthMonth, minBirthDay,
+        maxBirthMonth, maxBirthDay
+      ]);
 
-      return humans;
-    }, [globeState.notableHumanData, debouncedSearchQuery, sortBy, sortAsc, debouncedBirthYearRange]);
-
+    // ← Build a `filters` object with every single value & setter
     const filters = useMemo(() => ({
-      searchQuery, setSearchQuery,
-      sortBy, setSortBy,
-      sortAsc, setSortAsc,
-      birthYearRange, setBirthYearRange,
-    }), [searchQuery, sortBy, sortAsc, birthYearRange, setSearchQuery, setSortBy, setSortAsc, setBirthYearRange]);
-
+        searchQuery,    setSearchQuery,
+        sortBy,         setSortBy,
+        sortAsc,        setSortAsc,
+        birthYearRange, setBirthYearRange,
+        minBirthMonth,  setMinBirthMonth,
+        minBirthDay,    setMinBirthDay,
+        maxBirthMonth,  setMaxBirthMonth,
+        maxBirthDay,    setMaxBirthDay,
+    }), [
+        searchQuery, sortBy, sortAsc, birthYearRange,
+        minBirthMonth, minBirthDay, maxBirthMonth, maxBirthDay
+    ]);
 
     if (globeState.dataLoadError) {
         return (

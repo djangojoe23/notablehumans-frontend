@@ -178,16 +178,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
           </Typography>
         </Box>
 
-          <Filter
-            sortBy={filters.sortBy}
-            setSortBy={filters.setSortBy}
-            sortAsc={filters.sortAsc}
-            setSortAsc={filters.setSortAsc}
-            searchQuery={filters.searchQuery}
-            setSearchQuery={filters.setSearchQuery}
-            birthYearRange={filters.birthYearRange}
-            setBirthYearRange={filters.setBirthYearRange}
-          />
+          <Filter {...filters} />
 
           <Box
               sx={{

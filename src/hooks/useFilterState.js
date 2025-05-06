@@ -6,11 +6,12 @@ export const useFilterState = () => {
   const [sortBy, setSortBy] = useState('n');
   const [sortAsc, setSortAsc] = useState(true);
 
-  const [birthYearRange, setBirthYearRange] = useState([-4000, 2025]);
-  const [minBirthMonth, setMinBirthMonth] = useState(null);
-  const [minBirthDay,    setMinBirthDay]    = useState(null);
-  const [maxBirthMonth,  setMaxBirthMonth]  = useState(null);
-  const [maxBirthDay,    setMaxBirthDay]    = useState(null);
+  const [filterYear,    setFilterYear]    = useState(null);
+  const [filterMonth, setFilterMonth] = useState(null);
+  const [filterDay,   setFilterDay]   = useState(null);
+  const [filterYearRange,    setFilterYearRange]    = useState(null);
+
+  const [dateFilterType, setDateFilterType] = useState('born');
 
 
   return {
@@ -18,11 +19,11 @@ export const useFilterState = () => {
     sortBy, setSortBy,
     sortAsc, setSortAsc,
 
-    birthYearRange, setBirthYearRange,
+    filterYear,      setFilterYear,
+    filterMonth,  setFilterMonth,
+    filterDay,    setFilterDay,
+    filterYearRange,      setFilterYearRange,
 
-    minBirthMonth, setMinBirthMonth,
-    minBirthDay,   setMinBirthDay,
-    maxBirthMonth, setMaxBirthMonth,
-    maxBirthDay,   setMaxBirthDay,
+    dateFilterType, setDateFilterType,
   };
 };

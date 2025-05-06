@@ -11,6 +11,15 @@ import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { sortHumansComparator } from './utils/sortHumans';
 
 
+// Helper to construct dates correctly even for ancient years
+const makeFilterDate = (year, month, day) => {
+  const d = new Date(0);               // epoch
+  d.setUTCFullYear(year, month - 1, day);
+  d.setUTCHours(0, 0, 0, 0);
+  return d;
+};
+
+
 function App() {
     const globeState = useGlobeState();
 
@@ -30,72 +39,155 @@ function App() {
         searchQuery,    setSearchQuery,
         sortBy,         setSortBy,
         sortAsc,        setSortAsc,
-        birthYearRange, setBirthYearRange,
-        minBirthMonth,  setMinBirthMonth,
-        minBirthDay,    setMinBirthDay,
-        maxBirthMonth,  setMaxBirthMonth,
-        maxBirthDay,    setMaxBirthDay,
+        filterYear, setFilterYear,
+        filterYearRange, setFilterYearRange,
+        filterMonth,  setFilterMonth,
+        filterDay,    setFilterDay,
+        dateFilterType, setDateFilterType
       } = useFilterState();
 
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
-    const debouncedBirthYearRange = useDebouncedValue(birthYearRange, 300); // 300ms delay
+    const debouncedFilterYearRange = useDebouncedValue(filterYearRange, 300); // 300ms delay
+    const debouncedFilterYear  = useDebouncedValue(filterYear, 300);
 
-    const notableHumans = useMemo(() => {
+        // filter + sort humans
+      const notableHumans = useMemo(() => {
         if (!globeState.notableHumanData?.features) return [];
 
-        // map GeoJSON → flat array
         let humans = globeState.notableHumanData.features.map(f => ({
           ...f.properties,
           lng: f.geometry.coordinates[0],
           lat: f.geometry.coordinates[1],
         }));
 
-        // 1) Search‐by‐name
+        // 1) search-by-name
         if (debouncedSearchQuery.trim()) {
           const q = debouncedSearchQuery.toLowerCase();
-          humans = humans.filter(h =>
-            h.n?.toLowerCase().includes(q)
-          );
+          humans = humans.filter(h => h.n?.toLowerCase().includes(q));
         }
 
-        // 2) Date‐of‐birth filtering: year, then month/day
-        const [minY, maxY] = debouncedBirthYearRange;
+        // 2) date filtering (born/died/alive)
         humans = humans.filter(h => {
-          // parse a full birth‐date if available, or fallback to year only
-          let year = h.by;
-          let month = null;
-          let day = null;
+          // parse birth
+          let by = h.by;
+          let bm = null;
+          let bd = null;
+          if (h.bd) [by, bm, bd] = h.bd.split('-').map(n => parseInt(n, 10));
 
-          if (h.bd) {
-            [ year, month, day ] = h.bd
-              .split('-')
-              .map(num => parseInt(num, 10));
+          // parse death
+          let dy = null;
+          let dm = null;
+          let dd = null;
+          if (h.dd) [dy, dm, dd] = h.dd.split('-').map(n => parseInt(n, 10));
+
+          const y0 = debouncedFilterYear;
+          const r  = debouncedFilterYearRange;
+          const m0 = filterMonth;
+          const d0 = filterDay;
+
+          // compute year-range endpoints
+          const startYear = r != null ? Math.min(y0, y0 + r) : y0;
+          const endYear   = r != null ? Math.max(y0, y0 + r) : y0;
+
+          // helper for full date + range + year-only + exact
+          const inRange = (year, month, day) => {
+            if (year == null) return false;
+            if (r != null && m0 != null && d0 != null) {
+              if (month == null || day == null) return false;
+              const start = makeFilterDate(startYear, m0 - 1, d0);
+              const end   = makeFilterDate(endYear,   m0 - 1, d0);
+              const rec   = makeFilterDate(year,     month - 1, day);
+              return rec >= start && rec <= end;
+            }
+            if (r != null) {
+              return year >= startYear && year <= endYear;
+            }
+            if (year !== y0) return false;
+            if (m0  != null && month !== m0) return false;
+            if (d0  != null && day   !== d0) return false;
+            return true;
+          };
+
+          if (dateFilterType === 'born') {
+            if (y0 == null) {
+              if (m0 != null && bm !== m0) return false;
+              if (d0 != null && bd !== d0) return false;
+              return true;
+            }
+            return inRange(by, bm, bd);
           }
 
-          // Year check
-          if (minY != null && year < minY) return false;
-          if (maxY != null && year > maxY) return false;
-
-          // Month check
-          if (minBirthMonth != null) {
-            // if no month available, exclude
-            if (month == null) return false;
-            if (month < minBirthMonth) return false;
-            // if same month, check day
-            if (month === minBirthMonth && minBirthDay != null && day < minBirthDay) {
-              return false;
+          if (dateFilterType === 'died') {
+            if (dy == null) return false;
+            if (y0 == null) {
+              if (m0 != null && dm !== m0) return false;
+              if (d0 != null && dd !== d0) return false;
+              return true;
             }
+            return inRange(dy, dm, dd);
           }
-          if (maxBirthMonth != null) {
-            if (month == null) return false;
-            if (month > maxBirthMonth) return false;
-            if (month === maxBirthMonth && maxBirthDay != null && day > maxBirthDay) {
-              return false;
+
+          if (dateFilterType === 'alive') {
+            // require at least a year
+            if (y0 == null) return false;
+
+            // individual's life-span boundaries
+            const bornDate = makeFilterDate(by, bm || 1, bd || 1);
+            let deathBoundary;
+            if (dy != null) {
+              const dmVal = dm || 12;
+              const ddVal = dd || 31;
+              deathBoundary = makeFilterDate(dy, dmVal, ddVal);
+            } else {
+              const today   = new Date();
+              const capDate = makeFilterDate(by + 150, bm || 1, bd || 1);
+              deathBoundary = capDate < today ? capDate : today;
             }
+
+            // If user provided a range, compute full target window
+            if (r != null) {
+              let startTarget, endTarget;
+              // full-date range
+              if (m0 != null && d0 != null) {
+                startTarget = makeFilterDate(startYear, m0, d0);
+                endTarget   = makeFilterDate(endYear,   m0, d0);
+              }
+              // month-only range
+              else if (m0 != null) {
+                startTarget = makeFilterDate(startYear, m0, 1);
+                const days = new Date(endYear, m0, 0).getDate();
+                endTarget   = makeFilterDate(endYear,   m0, days);
+              }
+              // year-only range
+              else {
+                startTarget = makeFilterDate(startYear, 1, 1);
+                endTarget   = makeFilterDate(endYear,   12, 31);
+              }
+              return bornDate <= endTarget && deathBoundary >= startTarget;
+            }
+
+            // no range → original exact/month/year logic
+            // Year + Month + Day → exact-day match
+            if (m0 != null && d0 != null) {
+              const targetDay = makeFilterDate(y0, m0, d0);
+              return bornDate <= targetDay && deathBoundary >= targetDay;
+            }
+            // Year + Month → within-month match
+            if (m0 != null) {
+              const startOfMonth = makeFilterDate(y0, m0, 1);
+              const daysInMonth  = new Date(y0, m0, 0).getDate();
+              const endOfMonth   = makeFilterDate(y0, m0, daysInMonth);
+              return bornDate <= endOfMonth && deathBoundary >= startOfMonth;
+            }
+            // Year only → within-year match
+            const startOfYear = makeFilterDate(y0, 1, 1);
+            const endOfYear   = makeFilterDate(y0, 12, 31);
+            return bornDate <= endOfYear && deathBoundary >= startOfYear;
           }
 
           return true;
         });
+
 
         // 3) Sort
         humans.sort(sortHumansComparator(sortBy, sortAsc));
@@ -103,10 +195,10 @@ function App() {
       }, [
         globeState.notableHumanData,
         debouncedSearchQuery,
-        debouncedBirthYearRange,
+        debouncedFilterYearRange,
         sortBy, sortAsc,
-        minBirthMonth, minBirthDay,
-        maxBirthMonth, maxBirthDay
+        filterMonth, filterDay, debouncedFilterYear,
+        dateFilterType,
       ]);
 
     // ← Build a `filters` object with every single value & setter
@@ -114,14 +206,14 @@ function App() {
         searchQuery,    setSearchQuery,
         sortBy,         setSortBy,
         sortAsc,        setSortAsc,
-        birthYearRange, setBirthYearRange,
-        minBirthMonth,  setMinBirthMonth,
-        minBirthDay,    setMinBirthDay,
-        maxBirthMonth,  setMaxBirthMonth,
-        maxBirthDay,    setMaxBirthDay,
+        filterYear, setFilterYear,
+        filterYearRange, setFilterYearRange,
+        filterMonth,  setFilterMonth,
+        filterDay,    setFilterDay,
+        dateFilterType, setDateFilterType
     }), [
-        searchQuery, sortBy, sortAsc, birthYearRange,
-        minBirthMonth, minBirthDay, maxBirthMonth, maxBirthDay
+        searchQuery, sortBy, sortAsc, filterYearRange,
+        filterMonth, filterDay, filterYear, dateFilterType
     ]);
 
     if (globeState.dataLoadError) {

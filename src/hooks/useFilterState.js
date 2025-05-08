@@ -6,24 +6,27 @@ export const useFilterState = () => {
   const [sortBy, setSortBy] = useState('n');
   const [sortAsc, setSortAsc] = useState(true);
 
+  const [dateFilterType, setDateFilterType] = useState('born');
   const [filterYear,    setFilterYear]    = useState(null);
   const [filterMonth, setFilterMonth] = useState(null);
   const [filterDay,   setFilterDay]   = useState(null);
   const [filterYearRange,    setFilterYearRange]    = useState(null);
 
-  const [dateFilterType, setDateFilterType] = useState('born');
-
+  const [filterAgeType, setFilterAgeType] = useState('exact');
+  const [filterAge,     setFilterAge]     = useState(null);
 
   return {
     searchQuery, setSearchQuery,
     sortBy, setSortBy,
     sortAsc, setSortAsc,
 
+    dateFilterType, setDateFilterType,
     filterYear,      setFilterYear,
     filterMonth,  setFilterMonth,
     filterDay,    setFilterDay,
     filterYearRange,      setFilterYearRange,
 
-    dateFilterType, setDateFilterType,
+    filterAgeType, setFilterAgeType,
+    filterAge,     setFilterAge,
   };
 };

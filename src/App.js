@@ -39,19 +39,22 @@ function App() {
         searchQuery,    setSearchQuery,
         sortBy,         setSortBy,
         sortAsc,        setSortAsc,
+        dateFilterType, setDateFilterType,
         filterYear, setFilterYear,
         filterYearRange, setFilterYearRange,
         filterMonth,  setFilterMonth,
         filterDay,    setFilterDay,
-        dateFilterType, setDateFilterType
+        filterAgeType,  setFilterAgeType,
+        filterAge,      setFilterAge
       } = useFilterState();
 
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
     const debouncedFilterYearRange = useDebouncedValue(filterYearRange, 300); // 300ms delay
     const debouncedFilterYear  = useDebouncedValue(filterYear, 300);
+    const debouncedFilterAge  = useDebouncedValue(filterAge, 300);
 
-        // filter + sort humans
-      const notableHumans = useMemo(() => {
+    // filter + sort humans
+    const notableHumans = useMemo(() => {
         if (!globeState.notableHumanData?.features) return [];
 
         let humans = globeState.notableHumanData.features.map(f => ({
@@ -188,32 +191,65 @@ function App() {
           return true;
         });
 
+        // 2) lived‑to‑be filter
+        humans = humans.filter(h => {
+          if (debouncedFilterAge == null) return true;        // no age filter → keep all
+          // parse birth
+          const [by, bm = 1, bd = 1] = h.bd
+            ? h.bd.split('-').map(n => +n)
+            : [null, null, null];
+          if (by == null) return false;
+
+          let age;
+          if (h.dd) {
+            // died → age at death
+            const [dy, dm = 1, dd] = h.dd.split('-').map(n => +n);
+            age = dy - by;
+            if (dm < bm || (dm === bm && dd < bd)) age--;
+          } else {
+            // still alive → age up to today
+            const today = new Date();
+            age = today.getUTCFullYear() - by -
+              ((today.getUTCMonth()+1) < bm ||
+               ((today.getUTCMonth()+1) === bm && today.getUTCDate() < bd)
+                ? 1
+                : 0);
+            // exact → exclude still‑living
+            if (filterAgeType === 'exact') return false;
+          }
+
+          return filterAgeType === 'min'
+            ? age >= debouncedFilterAge
+            : age === debouncedFilterAge;
+        });
 
         // 3) Sort
         humans.sort(sortHumansComparator(sortBy, sortAsc));
         return humans;
-      }, [
-        globeState.notableHumanData,
-        debouncedSearchQuery,
-        debouncedFilterYearRange,
-        sortBy, sortAsc,
-        filterMonth, filterDay, debouncedFilterYear,
-        dateFilterType,
-      ]);
+    }, [
+    globeState.notableHumanData,
+    debouncedSearchQuery,
+    sortBy, sortAsc,
+    dateFilterType, filterMonth, filterDay, debouncedFilterYear, debouncedFilterYearRange,
+    filterAgeType, debouncedFilterAge,
+    ]);
 
     // ← Build a `filters` object with every single value & setter
     const filters = useMemo(() => ({
         searchQuery,    setSearchQuery,
         sortBy,         setSortBy,
         sortAsc,        setSortAsc,
+        dateFilterType, setDateFilterType,
         filterYear, setFilterYear,
         filterYearRange, setFilterYearRange,
         filterMonth,  setFilterMonth,
         filterDay,    setFilterDay,
-        dateFilterType, setDateFilterType
+        filterAgeType,  setFilterAgeType,
+        filterAge,      setFilterAge,
     }), [
-        searchQuery, sortBy, sortAsc, filterYearRange,
-        filterMonth, filterDay, filterYear, dateFilterType
+        searchQuery, sortBy, sortAsc,
+        dateFilterType, filterMonth, filterDay, filterYear, filterYearRange,
+        filterAgeType, filterAge,
     ]);
 
     if (globeState.dataLoadError) {

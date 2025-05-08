@@ -11,8 +11,11 @@ import {
   ToggleButtonGroup,
   ToggleButton,
   Tooltip,
+    Typography
 } from '@mui/material';
 import { ArrowUpward, ArrowDownward } from '@mui/icons-material';
+import { useTheme } from '@mui/material/styles'
+
 
 
 const Filter = ({
@@ -22,16 +25,18 @@ const Filter = ({
   setSortAsc,
   searchQuery,
   setSearchQuery,
-  filterYear=null,
-  setFilterYear,
-  filterMonth,
-  setFilterMonth,
-  filterDay,
-  setFilterDay,
-  filterYearRange = null,
-  setFilterYearRange,
   dateFilterType, setDateFilterType,
+  filterYear=null, setFilterYear,
+  filterMonth, setFilterMonth,
+  filterDay, setFilterDay,
+  filterYearRange = null, setFilterYearRange,
+  filterAge, setFilterAge,
+  filterAgeType, setFilterAgeType
 }) => {
+
+  const theme = useTheme()
+  console.log(theme.typography)
+
   const handleSortDirectionChange = (_, newDirection) => {
     if (newDirection !== null) setSortAsc(newDirection === 'asc');
   };
@@ -50,7 +55,7 @@ const Filter = ({
 
   return (
     <Box sx={{ p: 2, pb: 0 }}>
-      <Stack spacing={2}>
+      <Stack spacing={0}>
         {/* Search by Name */}
         <TextField
           label="Search by Name"
@@ -62,7 +67,7 @@ const Filter = ({
         />
 
         {/* Filter Date and Years Since Sections */}
-        <Box sx={{ display: 'flex', gap: 0 }}>
+        <Box sx={{ display: 'flex', gap: 0}}>
           {/* Filter Date Fieldset */}
           <Box
             component="fieldset"
@@ -72,7 +77,7 @@ const Filter = ({
               borderColor: 'divider',
               borderRadius: 1,
               p: 1,
-              '& legend': { fontSize: '0.875rem', fontWeight: 500 }
+              '& legend': {}
             }}
           >
             <Box component="legend">
@@ -81,6 +86,15 @@ const Filter = ({
                   exclusive
                   size="small"
                   onChange={(_, v) => v && setDateFilterType(v)}
+                  sx={{
+                    '& .MuiToggleButton-root': {
+                      ...theme.typography.subtitle2,
+                      textTransform: 'none',
+                    },
+                    '& .Mui-selected': {
+                      fontWeight: theme.typography.subtitle2.fontWeight + 100, // e.g. 600 → 700
+                    },
+                  }}
                 >
                   <ToggleButton value="born">Born</ToggleButton>
                   <ToggleButton value="died">Died</ToggleButton>
@@ -91,7 +105,7 @@ const Filter = ({
                         disabled={!filterYear}
                         aria-describedby="alive-on-help"
                       >
-                        Alive
+                        Alive On
                       </ToggleButton>
                     </span>
                   </Tooltip>
@@ -152,7 +166,12 @@ const Filter = ({
               borderColor: 'divider',
               borderRadius: 1,
               p: 1,
-              '& legend': { fontSize: '0.85rem', fontWeight: 500 }
+              // mt: '1px',
+              '& legend': {
+                ...theme.typography.subtitle2,
+                fontWeight: theme.typography.subtitle2.fontWeight + 100, // e.g. 600 → 700
+                lineHeight: 1.25
+              }
             }}
           >
             <Box component="legend">Or Within the Following</Box>
@@ -188,11 +207,74 @@ const Filter = ({
           </Box>
         </Box>
 
+        {/* Lived-to-be Filter */}
+        <Stack
+          direction="row"
+          alignItems="center"
+          spacing={1}
+          sx={{ px: 1 /* match your other padding */, py: 0.5 }}
+        >
+          <Typography variant="subtitle2">Lived to be</Typography>
+
+          <ToggleButtonGroup
+            value={filterAgeType}
+            exclusive
+            size="small"
+            onChange={(_, v) => v && setFilterAgeType(v)}
+            sx={{ '& .MuiToggleButton-root': { textTransform: 'none', minWidth: 56, px: 1 } }}
+          >
+            <ToggleButton value="min">at least</ToggleButton>
+            <ToggleButton value="exact">exactly</ToggleButton>
+          </ToggleButtonGroup>
+
+          <TextField
+            placeholder=""
+            variant="outlined"
+            size="small"
+            type="number"
+            value={filterAge ?? ''}
+            onChange={e => setFilterAge(e.target.value === '' ? null : +e.target.value)}
+            slotProps={{
+                htmlInput: {
+                  min: 0,
+                  step: 1,                // spinner moves by 1
+                  inputMode: 'numeric',   // mobile numeric keyboard
+                  pattern: '[0-9]*'     // only digits & optional leading “-”
+                }
+              }}
+            sx={{
+              width: 60,
+              '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': {
+                WebkitAppearance: 'none'
+              },
+              '& input[type=number]': { MozAppearance: 'textfield' }
+            }}
+          />
+
+          <Typography variant="subtitle2">years old.</Typography>
+        </Stack>
+
         {/* Sort Options Fieldset */}
-        <Box component="fieldset" sx={{ border: 1, borderColor: 'divider', borderRadius: 1, p: 1, '& legend': { fontSize: '0.875rem', fontWeight: 500 } }}>
+        <Box
+            component="fieldset"
+            sx={{
+              border: 1,
+              borderColor: 'divider',
+              borderRadius: 1,
+              p: 1,
+              '& legend': {
+                fontSize: '0.875rem',
+                fontWeight: 500
+              }
+        }}>
           <Box component="legend">Sort By</Box>
-          <Stack direction="row" spacing={1} alignItems="center">
-            <FormControl fullWidth size="small">
+          <Stack
+              direction="row"
+              spacing={1}
+              alignItems="center"
+              sx={{ height: 40 }}
+          >
+            <FormControl fullWidth size="small" sx={{ height: '100%' }}>
               <Select value={sortBy} onChange={e => setSortBy(e.target.value)}>
                 <MenuItem value="n">Name</MenuItem>
                 <MenuItem value="bd">Birth Date</MenuItem>
@@ -209,6 +291,7 @@ const Filter = ({
               onChange={handleSortDirectionChange}
               size="small"
               color="primary"
+              sx={{height:'100%'}}
             >
               <ToggleButton value="asc"><ArrowDownward fontSize="small"/></ToggleButton>
               <ToggleButton value="desc"><ArrowUpward fontSize="small"/></ToggleButton>

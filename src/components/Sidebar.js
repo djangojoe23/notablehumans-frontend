@@ -5,6 +5,8 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VariableSizeList as VirtualList } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
+import { useTheme } from '@mui/material/styles';
+
 
 import { SIDEBAR_WIDTH, BUTTON_SIZE } from '../constants/layout';
 import { formatYear } from '../utils/format';
@@ -12,30 +14,39 @@ import OverflowTooltip from './OverflowTooltip';
 import HumanDetail from './HumanDetail';
 import Filter from './Filter';
 
+import axios from 'axios';
 
 const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
+  const theme = useTheme();
+
   const listRef = useRef(null);
 
   const getItemSize = () => 36; // fixed row height for now
 
-  const handleRowClick = (human) => {
+  const handleRowClick = async (human) => {
     const globe = globeState.globeRef.current;
     if (!globe) return;
 
     // If clicking the already selected human, deselect
     if (globeState.detailedHuman?.id === human.id) {
-    globeState.setDetailedHuman(null);
-    return;
+        globeState.setDetailedHuman(null);
+        return;
     }
 
     // Otherwise, select new human and fly to them
     globe.flyTo({
-    center: [human.lng, human.lat],
-    zoom: globe.getZoom(),
-    essential: true,
+        center: [human.lng, human.lat],
+        zoom: globe.getZoom(),
+        essential: true,
     });
 
-    globeState.setDetailedHuman(human);
+    try {
+        const res = await axios.get(`${process.env.REACT_APP_API_URL}/human/${human.id}/`);
+        globeState.setDetailedHuman(res.data);  // ✅ Set full detail
+      } catch (err) {
+        console.error("Failed to fetch detailed human", err);
+        globeState.setDetailedHuman(null);
+      }
   };
 
 
@@ -102,7 +113,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      backgroundColor: '#f28cb1',
+                      backgroundColor: theme.palette.primary.main,
                       opacity: 0.4,
                       transform: 'scale(calc(1 + var(--pulse-ratio) * 3))',
                       transition: 'transform 16ms linear, opacity 16ms linear',
@@ -115,7 +126,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
                       width: 8,
                       height: 8,
                       borderRadius: '50%',
-                      backgroundColor: '#f28cb1',
+                      backgroundColor: theme.palette.primary.main,
                       zIndex: 1,
                     }}
                   />
@@ -253,7 +264,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
 
       {/* Sidebar Toggle Button */}
       <motion.div
-        animate={{ x: globeState.sidebarOpen ? SIDEBAR_WIDTH - 60 : 10 }}
+        animate={{ x: globeState.sidebarOpen ? SIDEBAR_WIDTH+10 : 10 }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
         style={{
           position: 'absolute',
@@ -271,7 +282,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
             height: '100%',
             borderRadius: '50%',
             border: '2px solid #666',
-            backgroundColor: '#f28cb1',
+            backgroundColor: theme.palette.primary.main,
             color: '#666',
           }}
         >

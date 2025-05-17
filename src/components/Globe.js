@@ -2,6 +2,8 @@ import React, {useEffect, useRef} from 'react';
 import { Box } from '@mui/material';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { useTheme } from '@mui/material/styles';
+
 
 import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
 import updateClusterVisualStates from "../utils/updateClusterVisualStates";
@@ -23,6 +25,7 @@ const buildFilteredGeoJSON = (notableHumans) => ({
 });
 
 const Globe = ({ notableHumans = [], filters, ...globeState }) => {
+  const theme = useTheme();
   const containerRef = useRef(null);
   const popupRef = useRef(null);
   const clusterWithPopupRef = useRef({ clusterId: null, lngLat: null, totalCount: 0 });
@@ -59,7 +62,7 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         source: 'humans',
         filter: ['has', 'point_count'],
         paint: {
-          'circle-color': '#f28cb1',
+          'circle-color': theme.palette.primary.main,
           'circle-stroke-color': [
             'case',
             ['boolean', ['feature-state', 'fullyOverlapping'], false],
@@ -89,8 +92,10 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         filter: ['has', 'point_count'],
         layout: {
           'text-field': ['get', 'point_count_abbreviated'],
-          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
           'text-size': 12,
+          'text-anchor': 'center',
+          'text-offset': [-0.05, 0.15],
         },
         paint: {
           'text-color': '#444',
@@ -103,7 +108,7 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         source: 'humans',
         filter: ['!', ['has', 'point_count']],
         paint: {
-          'circle-color': '#f28cb1',
+          'circle-color': theme.palette.primary.main,
           'circle-radius': 10,
           'circle-stroke-width': 2,
           'circle-stroke-color': '#666'
@@ -117,8 +122,10 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         filter: ['!', ['has', 'point_count']],
         layout: {
           'text-field': '1',
-          'text-font': ['DIN Offc Pro Medium', 'Arial Unicode MS Bold'],
+          'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
           'text-size': 10,
+          'text-anchor': 'center',
+          'text-offset': [0, 0.15],
           'text-ignore-placement': true,
           'text-allow-overlap': true,
         },
@@ -141,7 +148,7 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         source: 'halo',
         paint: {
           'circle-radius': ['+', ['get', 'baseRadius'], ['get', 'pulseOffset']],
-          'circle-color': '#f28cb1',
+          'circle-color': theme.palette.primary.main,
           'circle-opacity': 0.5,
           'circle-stroke-color': 'rgba(255, 255, 255, 0.8)',
           'circle-stroke-width': 2

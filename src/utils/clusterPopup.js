@@ -1,5 +1,7 @@
 import mapboxgl from 'mapbox-gl';
 import { sortHumansComparator } from './sortHumans';
+import axios from 'axios';
+
 
 export function buildClusterPopup(globe, globeState, popupRef, clusterId, lngLat, totalCount, sortBy, sortAsc) {
   if (popupRef.current) {
@@ -93,18 +95,32 @@ export function buildClusterPopup(globe, globeState, popupRef, clusterId, lngLat
       row.addEventListener('mouseenter', () => row.style.backgroundColor = '#f5f5f5');
       row.addEventListener('mouseleave', () => row.style.backgroundColor = '');
 
-      row.addEventListener('click', () => {
-        const human = {
-          ...l.properties,
-          lat: l.geometry.coordinates[1],
-          lng: l.geometry.coordinates[0]
-        };
-        globe.flyTo({ center: [human.lng, human.lat], zoom: globe.getZoom(), essential: true });
-        globeState.setDetailedHuman(human);
-        if (!globeState.sidebarOpenRef?.current && !globeState.sidebarOpen) {
-          globeState.setSidebarOpen(true);
+      row.addEventListener('click', async () => {
+        const id = l.properties.id;
+        const lat = l.geometry.coordinates[1];
+        const lng = l.geometry.coordinates[0];
+
+        globe.flyTo({ center: [lng, lat], zoom: globe.getZoom(), essential: true });
+
+        try {
+          const res = await axios.get(`${process.env.REACT_APP_API_URL}/human/${id}/`);
+
+          globeState.setDetailedHuman({
+            ...res.data,
+            lat,
+            lng,
+          });
+
+          if (!globeState.sidebarOpenRef?.current && !globeState.sidebarOpen) {
+            globeState.setSidebarOpen(true);
+          }
+        } catch (err) {
+          console.error("Failed to fetch detailed human", err);
+          globeState.setDetailedHuman(null);
         }
       });
+
+
 
       listDiv.appendChild(row);
     });

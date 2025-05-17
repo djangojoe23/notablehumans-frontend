@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from "axios";
-import { Box, Typography } from '@mui/material';
+import { Box, Typography, CircularProgress } from '@mui/material';
 
 import Header from './components/Header';
 import Sidebar from './components/Sidebar';
@@ -23,9 +23,11 @@ const makeFilterDate = (year, month, day) => {
 function App() {
     const globeState = useGlobeState();
 
+    const [articleMetadata, setArticleMetadata] = useState(null);
+
     useEffect(() => {
         axios
-        .get(`${process.env.REACT_APP_API_URL}/notable-humans-geojson/`)
+        .get(`${process.env.REACT_APP_API_URL}/names-coords-dates/`)
         .then((res) => {
             globeState.setNotableHumanData(res.data);
         })
@@ -36,17 +38,30 @@ function App() {
     }, []);
 
     const {
-        searchQuery,    setSearchQuery,
-        sortBy,         setSortBy,
-        sortAsc,        setSortAsc,
-        dateFilterType, setDateFilterType,
-        filterYear, setFilterYear,
-        filterYearRange, setFilterYearRange,
-        filterMonth,  setFilterMonth,
-        filterDay,    setFilterDay,
-        filterAgeType,  setFilterAgeType,
-        filterAge,      setFilterAge
-      } = useFilterState();
+    searchQuery,    setSearchQuery,
+    sortBy,         setSortBy,
+    sortAsc,        setSortAsc,
+    dateFilterType, setDateFilterType,
+    filterYear, setFilterYear,
+    filterYearRange, setFilterYearRange,
+    filterMonth,  setFilterMonth,
+    filterDay,    setFilterDay,
+    filterAgeType,  setFilterAgeType,
+    filterAge,      setFilterAge
+  } = useFilterState();
+
+    // ✅ Fetch article metadata only when needed
+    useEffect(() => {
+        if (
+          ["cd", "al", "rv", "te"].includes(sortBy) &&
+          !articleMetadata
+        ) {
+          axios
+            .get(`${process.env.REACT_APP_API_URL}/article-metadata/`)
+            .then((res) => setArticleMetadata(res.data))
+            .catch((err) => console.error("Failed to load article metadata", err));
+        }
+    }, [sortBy, articleMetadata]);
 
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
     const debouncedFilterYearRange = useDebouncedValue(filterYearRange, 300); // 300ms delay
@@ -63,6 +78,14 @@ function App() {
           lat: f.geometry.coordinates[1],
         }));
 
+        // ✅ Merge metadata before filtering/sorting
+        if (articleMetadata) {
+          humans = humans.map(h => ({
+            ...h,
+            ...(articleMetadata[h.id] || {})
+          }));
+        }
+
         // 1) search-by-name
         if (debouncedSearchQuery.trim()) {
           const q = debouncedSearchQuery.toLowerCase();
@@ -78,7 +101,7 @@ function App() {
           if (h.bd) [by, bm, bd] = h.bd.split('-').map(n => parseInt(n, 10));
 
           // parse death
-          let dy = null;
+          let dy = h.dy;
           let dm = null;
           let dd = null;
           if (h.dd) [dy, dm, dd] = h.dd.split('-').map(n => parseInt(n, 10));
@@ -264,10 +287,17 @@ function App() {
 
     if (!globeState.notableHumanData) {
         return (
-          <Box display="flex" justifyContent="center" alignItems="center" height="100vh">
-            <Typography>Loading...</Typography>
-          </Box>
-        );
+            <Box
+              display="flex"
+              justifyContent="center"
+              alignItems="center"
+              height="100vh"
+              flexDirection="column"
+            >
+              <CircularProgress />
+              <Typography mt={2}>Loading data...</Typography>
+            </Box>
+          );
     }
 
   return (

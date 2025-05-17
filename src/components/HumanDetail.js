@@ -1,10 +1,12 @@
 import React from 'react';
 import { Box, Typography, IconButton, Link, Stack } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import { useTheme } from '@mui/material/styles';
+
 
 import { ATTRIBUTE_LABELS } from '../constants/humanAttributeLabels';
 import { formatDate } from '../utils/format';
-import { FaMapMarkerAlt, FaWikipediaW } from 'react-icons/fa';
+import { FaWikipediaW } from 'react-icons/fa';
 import { SiWikidata } from 'react-icons/si';
 import { PiListMagnifyingGlass } from 'react-icons/pi';
 
@@ -17,6 +19,8 @@ export const formatAttributeLabel = (key) => {
 };
 
 const HumanDetail = ({ person, scrollToPerson, onFlyTo, onClose }) => {
+  const theme = useTheme();
+
   if (!person) return null;
 
   const {
@@ -152,7 +156,7 @@ return (
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    backgroundColor: '#f28cb1',
+                    backgroundColor: theme.palette.primary.main,
                     opacity: 0.4,
                     transform: 'scale(calc(1 + var(--pulse-ratio) * 3))',
                     transition: 'transform 16ms linear, opacity 16ms linear',
@@ -165,7 +169,7 @@ return (
                     width: 8,
                     height: 8,
                     borderRadius: '50%',
-                    backgroundColor: '#f28cb1',
+                    backgroundColor: theme.palette.primary.main,
                     zIndex: 1,
                   }}
                 />

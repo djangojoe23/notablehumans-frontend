@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Box, Paper, Typography, ListItem, ListItemText, IconButton } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
-import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ListIcon from '@mui/icons-material/List';
+import FilterListIcon from '@mui/icons-material/FilterList';
 import { motion, AnimatePresence } from 'framer-motion';
 import { VariableSizeList as VirtualList } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
@@ -18,8 +19,10 @@ import axios from 'axios';
 
 const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
   const theme = useTheme();
-
   const listRef = useRef(null);
+
+  const [activeTab, setActiveTab] = useState('browse');
+
 
   const getItemSize = () => 36; // fixed row height for now
 
@@ -48,7 +51,6 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
         globeState.setDetailedHuman(null);
       }
   };
-
 
   const renderRow = ({ index, style }) => {
     const human = notableHumans[index];
@@ -183,57 +185,65 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
           pointerEvents: 'auto',
         }}
       >
+        {/* HEADER + TABS */}
         <Box px={2} py={1}>
           <Typography variant="subtitle1" fontWeight="bold">
             All Notable Humans ({notableHumans.length})
           </Typography>
         </Box>
 
-          <Filter {...filters} />
-
-          <Box
-              sx={{
-                borderTop: '1px solid',
-                borderColor: 'grey.300',
-                mt: 1,
-              }}
-          />
-
+        {/* Tab Content */}
         <Box display="flex" flexDirection="column" flex={1} minHeight={0}>
-          <Box flex={1} minHeight={0}>
-            <AutoSizer>
-              {({ height, width }) => (
-              notableHumans.length > 0 ? (
+          {/* BROWSE TAB: search/sort is inside Filter(mode='browse') */}'
+          {activeTab === 'browse' && (
+          <>
+            <Filter mode="browse" {...filters} />
+            <Box sx={{ borderTop: '1px solid', borderColor: 'grey.300', mt: 1 }} />
 
-                <VirtualList
-                  ref={listRef}
-                  height={height}
-                  itemCount={notableHumans.length}
-                  itemSize={getItemSize}
-                  width={width}
-                >
-                  {renderRow}
-                </VirtualList>
-                  ) : (
-                  <Box
-                    height={height}
-                    width={width}
-                    display="flex"
-                    alignItems="center"
-                    justifyContent="center"
-                    p={2}
-                  >
-                    <Typography variant="body2" color="textSecondary" align="center">
-                      No humans found matching your filters.
-                    </Typography>
-                  </Box>
-                )
-              )}
-            </AutoSizer>
+            {/* LIST + DETAIL */}
+            <Box display="flex" flexDirection="column" flex={1} minHeight={0}>
+              <Box flex={1} minHeight={0}>
+                <AutoSizer>
+                  {({ height, width }) =>
+                    notableHumans.length > 0 ? (
+                      <VirtualList
+                        ref={listRef}
+                        height={height}
+                        itemCount={notableHumans.length}
+                        itemSize={getItemSize}
+                        width={width}
+                      >
+                        {renderRow}
+                      </VirtualList>
+                    ) : (
+                      <Box
+                        height={height}
+                        width={width}
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        p={2}
+                      >
+                        <Typography variant="body2" color="textSecondary" align="center">
+                          No humans found matching your filters.
+                        </Typography>
+                      </Box>
+                    )
+                  }
+                </AutoSizer>
+              </Box>
+            </Box>
+          </>
+        )}
+
+        {/* FILTERS TAB */}
+        {activeTab === 'filters' && (
+          <Box flex={1} overflow="auto">
+            <Filter mode="filters" {...filters} />
           </Box>
+        )}
 
-          {/* Expanding Detail Panel */}
-          <AnimatePresence>
+        <AnimatePresence>
             {globeState.detailedHuman && (
               <Paper
                 component={motion.div}
@@ -243,7 +253,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
                 transition={{ duration: 0.3 }}
                 square
                 sx={{
-                  maxHeight: '34vh',
+                  maxHeight: '50vh',
                   overflowY: 'auto',
                   borderTop: '1px solid',
                   borderColor: 'grey.300',
@@ -251,18 +261,16 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
                 }}
               >
                 <HumanDetail
-                    person={globeState.detailedHuman}
-                    scrollToPerson={scrollToPerson}
-                    onFlyTo={flyToMarker}
-                    onClose={() => globeState.setDetailedHuman(null)}
-                  />
+                  person={globeState.detailedHuman}
+                  scrollToPerson={scrollToPerson}
+                  onFlyTo={flyToMarker}
+                  onClose={() => globeState.setDetailedHuman(null)}
+                />
               </Paper>
             )}
           </AnimatePresence>
         </Box>
       </Paper>
-
-      {/* Sidebar Toggle Button */}
       <motion.div
         animate={{ x: globeState.sidebarOpen ? SIDEBAR_WIDTH+10 : 10 }}
         transition={{ duration: 0.3, ease: 'easeInOut' }}
@@ -276,7 +284,16 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
         }}
       >
         <IconButton
-          onClick={() => globeState.setSidebarOpen(!globeState.sidebarOpen)}
+          onClick={() => {
+              if (globeState.sidebarOpen && activeTab === 'browse') {
+                // already open on browse → close
+                globeState.setSidebarOpen(false);
+              } else {
+                // open & switch to browse
+                globeState.setSidebarOpen(true);
+                setActiveTab('browse');
+              }
+            }}
           sx={{
             width: '100%',
             height: '100%',
@@ -286,9 +303,50 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
             color: '#666',
           }}
         >
-          {globeState.sidebarOpen ? <ChevronLeftIcon /> : <ChevronRightIcon />}
+            {globeState.sidebarOpen && activeTab === 'browse'
+              ? <ChevronLeftIcon />
+              : <ListIcon />
+            }
         </IconButton>
       </motion.div>
+
+    <motion.div
+        animate={{ x: globeState.sidebarOpen ? SIDEBAR_WIDTH+10 : 10 }}
+        transition={{ duration: 0.3, ease: 'easeInOut' }}
+        style={{
+          position: 'absolute',
+          top: BUTTON_SIZE + 20,
+          zIndex: 20,
+          width: BUTTON_SIZE,
+          height: BUTTON_SIZE,
+          pointerEvents: 'auto',
+        }}
+      >
+        <IconButton
+          onClick={() => {
+              if (globeState.sidebarOpen && activeTab === 'filters') {
+                globeState.setSidebarOpen(false);
+              } else {
+                globeState.setSidebarOpen(true);
+                setActiveTab('filters');
+              }
+            }}
+          sx={{
+            width: '100%',
+            height: '100%',
+            borderRadius: '50%',
+            border: '2px solid #666',
+            backgroundColor: theme.palette.primary.main,
+            color: '#666',
+          }}
+        >
+            {globeState.sidebarOpen && activeTab === 'filters'
+              ? <ChevronLeftIcon />
+              : <FilterListIcon />
+            }
+        </IconButton>
+      </motion.div>
+
     </Box>
   );
 };

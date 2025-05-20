@@ -1,126 +1,133 @@
-// Updated components/Filter.js
+// src/components/Filter.js
 import React, { useEffect, useState } from 'react';
 import {
-    Box,
-    Stack,
-    TextField,
-    FormControl,
-    Select,
-    MenuItem,
-    InputAdornment,
-    ToggleButtonGroup,
-    ToggleButton,
-    Tooltip,
-    Typography,
-    Button,
-    Autocomplete,
-    IconButton,
-    Chip,
-    Accordion,
-    AccordionSummary,
-    AccordionDetails
+  Box,
+  Stack,
+  TextField,
+  FormControl,
+  Select,
+  MenuItem,
+  InputAdornment,
+  ToggleButtonGroup,
+  ToggleButton,
+  Tooltip,
+  Typography,
+  Button,
+  IconButton,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import { ArrowUpward, ArrowDownward } from '@mui/icons-material';
-import { useTheme } from '@mui/material/styles'
+import { useTheme } from '@mui/material/styles';
 import axios from 'axios';
+import ProgressiveAutocomplete from '../utils/ProgressiveAutocomplete';
 
 
 const Filter = ({
+  mode = 'browse',
   sortBy,
   setSortBy,
   sortAsc,
   setSortAsc,
   searchQuery,
   setSearchQuery,
-  dateFilterType, setDateFilterType,
-  filterYear=null, setFilterYear,
-  filterMonth, setFilterMonth,
-  filterDay, setFilterDay,
-  filterYearRange = null, setFilterYearRange,
-  filterAge, setFilterAge,
-  filterAgeType, setFilterAgeType
+  dateFilterType,
+  setDateFilterType,
+  filterYear = null,
+  setFilterYear,
+  filterMonth,
+  setFilterMonth,
+  filterDay,
+  setFilterDay,
+  filterYearRange = null,
+  setFilterYearRange,
+  filterAge,
+  setFilterAge,
+  filterAgeType,
+  setFilterAgeType,
+  attributeFilters,
+  setAttributeFilters
 }) => {
+  const theme = useTheme();
+  const [attributeOptions, setAttributeOptions] = useState({});
 
-    const theme = useTheme()
-
-    const [attributeOptions, setAttributeOptions] = useState({});
-    useEffect(() => {
-      axios.get(`${process.env.REACT_APP_API_URL}/attributes-dict/`)
-        .then(res => setAttributeOptions(res.data))
-        .catch(err => console.error("Error loading attributes:", err));
-    }, []);
-
-    // true if there’s at least one attribute filter with no attribute chosen yet
-    const [attributeFilters, setAttributeFilters] = React.useState([
-    { id: 1, attribute: '', matchType: 'any', values: [] }
-    ]);
-    const hasEmptyFilter = attributeFilters.some(f =>
-      f.attribute === '' || f.values.length === 0
-    );
-
-    const handleSortDirectionChange = (_, newDirection) => {
-        if (newDirection !== null) setSortAsc(newDirection === 'asc');
-    };
-
-  const abbreviatedMonths = ['', 'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-  // whenever Alive loses its date, force back to Born
+  // load attribute options
   useEffect(() => {
-    if (
-      dateFilterType === 'alive' && filterYear == null
-    ) {
-      setDateFilterType('born')
+    axios.get(`${process.env.REACT_APP_API_URL}/attributes-dict/`)
+      .then(res => {
+        const withMissing = {};
+        Object.entries(res.data).forEach(([key, opts]) => {
+          withMissing[key] = ['__MISSING__', ...opts];
+        });
+        setAttributeOptions(withMissing);
+      })
+      .catch(console.error);
+  }, []);
+
+  const handleSortDirectionChange = (_, dir) => {
+    if (dir !== null) setSortAsc(dir === 'asc');
+  };
+
+  const abbreviatedMonths = ['', 'Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+  // keep “alive” only if year exists
+  useEffect(() => {
+    if (dateFilterType === 'alive' && filterYear == null) {
+      setDateFilterType('born');
     }
-  }, [dateFilterType, filterYear, setDateFilterType])
+  }, [dateFilterType, filterYear, setDateFilterType]);
 
-  // Shared accordion styles
-  const summarySX = {
-    flexDirection: 'row-reverse',
-    p: 0,
-    py: 1,
-    minHeight: 0,
-    '&.Mui-expanded': { minHeight: 0 },
-    '& .MuiAccordionSummary-content': { pl: 1, margin: 0 },
-    '& .MuiAccordionSummary-content.Mui-expanded': { margin: 0 }
-  };
-
-  // Accordion root override to remove expanded margin
-  const accordionSX = {
-    '&.Mui-expanded': { margin: 0 }
-  };
+  const formatOption = o => o === '__MISSING__' ? '(Not recorded)' : o;
 
   return (
-    <Box sx={{ p: 1, pb: 0, pt: 0 }}>
-      <Stack spacing={0}>
-        {/* Search by Name */}
-        <Box sx={{my:1}}>
-          <TextField
+    <Box sx={{ p: 1 }}>
+      <Stack spacing={1}>
+        {mode === 'browse' && (
+          <>
+            {/* Search */}
+            <TextField
               label="Search by Name"
-              variant="outlined"
               size="small"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               fullWidth
-          />
-        </Box>
+            />
 
+            {/* Sort */}
+            <Box component="fieldset" sx={{
+              border: 1, borderColor: 'divider', borderRadius: 1, p: 1,
+              '& legend': { fontSize: '0.875rem', fontWeight: 500 }
+            }}>
+              <Box component="legend">Sort List By</Box>
+              <Stack direction="row" spacing={1} alignItems="center">
+                <FormControl fullWidth size="small">
+                  <Select value={sortBy} onChange={e => setSortBy(e.target.value)}>
+                    <MenuItem value="n">Name</MenuItem>
+                    <MenuItem value="bd">Birth Date</MenuItem>
+                    <MenuItem value="dd">Death Date</MenuItem>
+                    <MenuItem value="cd">Wikipedia Created Date</MenuItem>
+                    <MenuItem value="al">Wikipedia Article Length</MenuItem>
+                    <MenuItem value="rv">Wikipedia Recent Views</MenuItem>
+                    <MenuItem value="te">Wikipedia Total Edits</MenuItem>
+                  </Select>
+                </FormControl>
+                <ToggleButtonGroup
+                  value={sortAsc ? 'asc' : 'desc'}
+                  exclusive onChange={handleSortDirectionChange}
+                  size="small" color="primary"
+                >
+                  <ToggleButton value="asc"><ArrowDownward fontSize="small"/></ToggleButton>
+                  <ToggleButton value="desc"><ArrowUpward fontSize="small"/></ToggleButton>
+                </ToggleButtonGroup>
+              </Stack>
+            </Box>
+          </>
+        )}
 
-        {/* Birth & Death Date Filter Accordion */}
-        <Accordion defaultExpanded disableGutters sx={accordionSX}>
-          <AccordionSummary
-            expandIcon={<ExpandMoreIcon />}
-            disableGutters
-            sx={summarySX}
-          >
-            <Typography variant="subtitle2" sx={{ fontSize: ".9rem" }}>Dates Filter</Typography>
-          </AccordionSummary>
-          <AccordionDetails sx={{px: .25, pt: 0, pb: 1}}>
-            {/* Date & Years Since Filters */}
+        {mode === 'filters' && (
+          <Box sx={{ height: '100%', overflowY: 'auto' }}>
+            {/* Date Filter */}
             <Box sx={{ display: 'flex', gap: 0, my: 0}}>
-              {/* Date Fieldset */}
-              <Box
+            <Box
                 component="fieldset"
                 sx={{
                   flex: 1,
@@ -234,7 +241,7 @@ const Filter = ({
               justifyContent="center"
               alignItems="center"
               spacing={1}
-              sx={{ px: 0, py: 0, pt: 1 }}
+              sx={{ px: 0, py: 0, pt: 2 }}
             >
               <Typography variant="subtitle2">Lived to be</Typography>
               <ToggleButtonGroup
@@ -259,226 +266,105 @@ const Filter = ({
               />
               <Typography variant="subtitle2">years old.</Typography>
             </Stack>
-          </AccordionDetails>
-        </Accordion>
 
-
-        {/* Attribute Filter Accordion */}
-        <Accordion defaultExpanded disableGutters sx={accordionSX}>
-          <AccordionSummary
-            expandIcon={<ExpandMoreIcon />}
-            sx={summarySX}
-          >
-            <Typography variant="subtitle2" sx={{ fontSize: ".9rem" }}>Attributes Filter</Typography>
-          </AccordionSummary>
-          <AccordionDetails sx={{py: 0, px: 0.5}}>
-            <Box sx={{ my: 0, py: 0 }}>
+            {/* Attribute Filters */}
+            <Box
+                component="fieldset"
+                sx={{
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                  mt: 2,
+                  '& legend': {
+                    ...theme.typography.subtitle2,
+                    fontWeight: theme.typography.subtitle2.fontWeight + 100,
+                    lineHeight: 1.3
+                  }
+                }}
+            >
+              <Box component="legend">Attributes Filter</Box>
               {attributeFilters.map(f => (
-  <Box
-    key={f.id}
-    sx={{ mb: 1, p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}
-  >
-    {/* Line 1: selector, match toggle, clear */}
-    <Stack direction="row" alignItems="center" spacing={1}>
-      <FormControl size="small" sx={{ minWidth: 120 }}>
-        <Select
-          displayEmpty
-          value={f.attribute}
-          onChange={e => {
-            const attr = e.target.value;
-            setAttributeFilters(fs =>
-              fs.map(x =>
-                x.id === f.id
-                  ? { ...x, attribute: attr, values: [] }
-                  : x
-              )
-            );
-          }}
-        >
-          <MenuItem value=""><em>Choose…</em></MenuItem>
-          {Object.keys(attributeOptions).map(key => (
-            <MenuItem key={key} value={key}>
-              {key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+                <Box key={f.id} sx={{ mb: 2, p: 1, border: 1, borderColor: 'divider', borderRadius: 1 }}>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    {Object.keys(attributeOptions).length > 0 && (
+                      <FormControl size="small" sx={{ minWidth: 120 }}>
+                        <Select
+                          displayEmpty
+                          value={f.attribute}
+                          onChange={e => {
+                            const attr = e.target.value;
+                            setAttributeFilters(fs => fs.map(x =>
+                              x.id === f.id ? { ...x, attribute: attr, values: [] } : x
+                            ));
+                          }}
+                        >
+                          <MenuItem value=""><em>Choose…</em></MenuItem>
+                          {Object.keys(attributeOptions).map(key => (
+                            <MenuItem key={key} value={key}>
+                              {key.replace(/_/g,' ').replace(/\b\w/g,c=>c.toUpperCase())}
+                            </MenuItem>
+                          ))}
+                        </Select>
+                      </FormControl>
+                    )}
 
-      <ToggleButtonGroup
-        size="small"
-        exclusive
-        value={f.matchType}
-        onChange={(_, v) =>
-          v && setAttributeFilters(fs =>
-            fs.map(x =>
-              x.id === f.id ? { ...x, matchType: v } : x
-            )
-          )
-        }
-      >
-        <ToggleButton value="any">Any</ToggleButton>
-        <ToggleButton value="all">All</ToggleButton>
-      </ToggleButtonGroup>
+                    <ToggleButtonGroup
+                      size="small"
+                      exclusive
+                      value={f.matchType}
+                      onChange={(_, v) => v && setAttributeFilters(fs => fs.map(x =>
+                        x.id === f.id ? { ...x, matchType: v } : x
+                      ))}
+                    >
+                      <ToggleButton value="any">Any</ToggleButton>
+                      <ToggleButton value="all">All</ToggleButton>
+                    </ToggleButtonGroup>
 
-      <Box sx={{ flexGrow: 1 }} />
+                    <Box flexGrow={1}/>
 
-      <Tooltip title="Remove attribute filter" placement="top">
-        <IconButton size="small" onClick={() => setAttributeFilters(fs => fs.filter(x => x.id !== f.id))}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </Tooltip>
-    </Stack>
+                    <Tooltip title="Remove">
+                      <IconButton size="small" onClick={() =>
+                        setAttributeFilters(fs => fs.filter(x => x.id !== f.id))
+                      }>
+                        <CloseIcon fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                  </Stack>
 
-      {/* Line 3: selected chips */}
-    {f.values.length > 0 && (
-      <Box sx={{ mt: 1 }}>
-        {f.values.map(val => (
-          <Chip
-            key={val}
-            label={val}
-            size="small"
-            onDelete={() =>
-              setAttributeFilters(fs =>
-                fs.map(x =>
-                  x.id === f.id
-                    ? {
-                        ...x,
-                        values: x.values.filter(v => v !== val)
-                      }
-                    : x
-                )
-              )
-            }
-            sx={{ mr: 0.5, mb: 0.5 }}
-          />
-        ))}
-      </Box>
-    )}
-
-    {/* Line 2: value picker */}
-    <Box sx={{ mt: 1 }}>
-      <Autocomplete
-        multiple
-        size="small"
-        options={attributeOptions[f.attribute.toLowerCase()] || []}
-        value={f.values}
-        onChange={(_, values) =>
-          setAttributeFilters(fs =>
-            fs.map(x =>
-              x.id === f.id ? { ...x, values } : x
-            )
-          )
-        }
-        openOnFocus
-        disableCloseOnSelect
-        clearOnBlur={false}
-        filterSelectedOptions
-        filterOptions={(options, { inputValue }) =>
-                      options.filter(opt =>
-                        opt.toLowerCase().startsWith(inputValue.toLowerCase())
+                  <ProgressiveAutocomplete
+                    options={attributeOptions[f.attribute] || []}
+                    value={f.values}
+                    onChange={vals =>
+                      setAttributeFilters(fs =>
+                        fs.map(x =>
+                          x.id === f.id ? { ...x, values: vals } : x
+                        )
                       )
                     }
-        renderInput={params => {
-          const { InputProps, ...rest } = params;
-          return (
-            <TextField
-              {...rest}
-              placeholder="Add…"
-              size="small"
-              fullWidth
-              slotProps={{
-                input: { ...InputProps, startAdornment: null }
-              }}
-            />
-          );
-        }}
-      />
-    </Box>
+                    placeholder="Add value…"
+                    limit={100}      // how many to show instantly
+                    delayMs={100}   // how long before loading the rest
+                  />
+                </Box>
+              ))}
 
-
-  </Box>
-))}
-
-
-              <Box sx={{ display: 'flex', justifyContent: 'right', alignItems: 'center', mb: 1 }}>
-                <Tooltip title={hasEmptyFilter ? "Finish the existing filter first" : ""}>
-                  <span>
-                    <Button
-                      size="small"
-                      variant="outlined"
-                      onClick={() => setAttributeFilters(f => [...f, { id: Date.now(), attribute: '', matchType: 'any', values: [] }])}
-                      disabled={hasEmptyFilter}
-                    >
-                      + Add Attribute
-                    </Button>
-                  </span>
-                </Tooltip>
+              <Box textAlign="right">
+                <Button
+                  size="small"
+                  variant="outlined"
+                  onClick={() => setAttributeFilters(fs => [
+                    ...fs,
+                    { id: Date.now(), attribute: '', matchType: 'any', values: [] }
+                  ])}
+                  disabled={attributeFilters.some(f => !f.attribute)}
+                >
+                  + Add Attribute
+                </Button>
               </Box>
             </Box>
-          </AccordionDetails>
-        </Accordion>
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-        {/* Sort Options Fieldset */}
-        <Box
-            component="fieldset"
-            sx={{
-              border: 1,
-              borderColor: 'divider',
-              borderRadius: 1,
-              p: 1,
-              mt: 1,
-              '& legend': {
-                fontSize: '0.875rem',
-                fontWeight: 500
-              }
-        }}>
-          <Box component="legend">Sort List By</Box>
-          <Stack
-              direction="row"
-              spacing={1}
-              alignItems="center"
-              sx={{ height: 40 }}
-          >
-            <FormControl fullWidth size="small" sx={{ height: '100%' }}>
-              <Select value={sortBy} onChange={e => setSortBy(e.target.value)}>
-                <MenuItem value="n">Name</MenuItem>
-                <MenuItem value="bd">Birth Date</MenuItem>
-                <MenuItem value="dd">Death Date</MenuItem>
-                <MenuItem value="cd">Wikipedia Created Date</MenuItem>
-                <MenuItem value="al">Wikipedia Article Length</MenuItem>
-                <MenuItem value="rv">Wikipedia Recent Views</MenuItem>
-                <MenuItem value="te">Wikipedia Total Edits</MenuItem>
-              </Select>
-            </FormControl>
-            <ToggleButtonGroup
-              value={sortAsc ? 'asc' : 'desc'}
-              exclusive
-              onChange={handleSortDirectionChange}
-              size="small"
-              color="primary"
-              sx={{height:'100%'}}
-            >
-              <ToggleButton value="asc"><ArrowDownward fontSize="small"/></ToggleButton>
-              <ToggleButton value="desc"><ArrowUpward fontSize="small"/></ToggleButton>
-            </ToggleButtonGroup>
-          </Stack>
-        </Box>
+          </Box>
+        )}
       </Stack>
     </Box>
   );

@@ -224,23 +224,52 @@ return (
           </Box>
 
           {/* Other Attributes */}
-          {Object.entries(ATTRIBUTE_LABELS).map(([key]) => {
-            let value = attributes[key];
-            if (!value) return null;
-            if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
-              try { value = JSON.parse(value); } catch {}
-            }
-            return (
-              <Box component="div" key={key} mb={2}>
-                <Typography component="dt" variant="body2" fontWeight="bold">
-                  {formatAttributeLabel(key)}
-                </Typography>
-                <Typography component="dd" variant="body2" ml={2} color="text.secondary">
-                  {Array.isArray(value) ? value.join(', ') : value}
-                </Typography>
-              </Box>
-            );
-          })}
+          {Object.entries(ATTRIBUTE_LABELS)
+            // 1) drop any key for which there is no real data
+            .filter(([key]) => {
+              let v = attributes[key];
+              if (v == null) return false;                // undefined or null
+              if (Array.isArray(v) && v.length === 0) return false;  // []
+              if (typeof v === 'string' && v.trim() === '') return false; // ""
+              // if you’re storing JSON‐strings of arrays, parse & test too:
+              if (
+                typeof v === 'string' &&
+                v.startsWith('[') &&
+                v.endsWith(']') &&
+                (() => {
+                  try {
+                    const arr = JSON.parse(v);
+                    return Array.isArray(arr) && arr.length === 0;
+                  } catch {
+                    return false;
+                  }
+                })()
+              ) {
+                return false;
+              }
+              return true;
+            })
+            // 2) render only the ones that passed
+            .map(([key]) => {
+              let value = attributes[key];
+              // if it’s a JSON‐string, parse it
+              if (typeof value === 'string' && value.startsWith('[') && value.endsWith(']')) {
+                try { value = JSON.parse(value); }
+                catch { /* leave as‐is */ }
+              }
+
+              return (
+                <Box component="div" key={key} mb={2}>
+                  <Typography component="dt" variant="body2" fontWeight="bold">
+                    {formatAttributeLabel(key)}
+                  </Typography>
+                  <Typography component="dd" variant="body2" ml={2} color="text.secondary">
+                    {Array.isArray(value) ? value.join(', ') : value}
+                  </Typography>
+                </Box>
+              );
+            })}
+
         </Box>
       </Box>
     </Box>

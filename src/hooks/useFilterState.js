@@ -15,6 +15,10 @@ export const useFilterState = () => {
   const [filterAgeType, setFilterAgeType] = useState('exact');
   const [filterAge,     setFilterAge]     = useState(null);
 
+  const [attributeFilters, setAttributeFilters] = useState([
+    { id: Date.now(), attribute: '', matchType: 'any', values: [] }
+  ]);
+
   return {
     searchQuery, setSearchQuery,
     sortBy, setSortBy,
@@ -28,5 +32,7 @@ export const useFilterState = () => {
 
     filterAgeType, setFilterAgeType,
     filterAge,     setFilterAge,
+
+    attributeFilters, setAttributeFilters,
   };
 };

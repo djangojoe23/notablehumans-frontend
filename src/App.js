@@ -9,6 +9,8 @@ import useGlobeState from './hooks/useGlobeState';
 import { useFilterState } from './hooks/useFilterState';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { sortHumansComparator } from './utils/sortHumans';
+import { generateFilterSummary } from './utils/filterSummary';
+
 
 
 // Helper to construct dates correctly even for ancient years
@@ -22,9 +24,27 @@ const makeFilterDate = (year, month, day) => {
 
 function App() {
     const globeState = useGlobeState();
-
     const [articleMetadata, setArticleMetadata] = useState(null);
+    const [filterSummary, setFilterSummary] = useState('');
 
+    const {
+        searchQuery,    setSearchQuery,
+        sortBy,         setSortBy,
+        sortAsc,        setSortAsc,
+        dateFilterType, setDateFilterType,
+        filterYear, setFilterYear,
+        filterYearRange, setFilterYearRange,
+        filterMonth,  setFilterMonth,
+        filterDay,    setFilterDay,
+        filterAgeType,  setFilterAgeType,
+        filterAge,      setFilterAge,
+        attributeFilters, setAttributeFilters
+    } = useFilterState();
+
+    // This will hold the list of IDs returned by your attribute-filter API
+    const [attributeMatchIds, setAttributeMatchIds] = useState([]);
+
+    // 1) Load the GeoJSON of all humans
     useEffect(() => {
         axios
         .get(`${process.env.REACT_APP_API_URL}/names-coords-dates/`)
@@ -37,20 +57,7 @@ function App() {
         });
     }, []);
 
-    const {
-    searchQuery,    setSearchQuery,
-    sortBy,         setSortBy,
-    sortAsc,        setSortAsc,
-    dateFilterType, setDateFilterType,
-    filterYear, setFilterYear,
-    filterYearRange, setFilterYearRange,
-    filterMonth,  setFilterMonth,
-    filterDay,    setFilterDay,
-    filterAgeType,  setFilterAgeType,
-    filterAge,      setFilterAge
-  } = useFilterState();
-
-    // ✅ Fetch article metadata only when needed
+    // 2) Load article metadata when needed
     useEffect(() => {
         if (
           ["cd", "al", "rv", "te"].includes(sortBy) &&
@@ -63,10 +70,39 @@ function App() {
         }
     }, [sortBy, articleMetadata]);
 
+    // 3) Whenever attributeFilters changes, hit the server for matching IDs
+    useEffect(() => {
+        // only call when there's at least one fully-configured filter
+        const active = attributeFilters.filter(f => f.attribute && f.values.length);
+        if (active.length > 0) {
+          axios.post(
+            `${process.env.REACT_APP_API_URL}/filter-by-attributes/`,
+            { filters: active }
+          )
+          .then(res => {
+            setAttributeMatchIds(Array.isArray(res.data.ids) ? res.data.ids : []);
+          })
+          .catch(err => {
+            console.error("Attribute filter failed", err);
+            setAttributeMatchIds([]); // treat as no matches
+          });
+        } else {
+          // no attribute filters → clear
+          setAttributeMatchIds([]); // no filter -> allow everyone
+        }
+    }, [attributeFilters]);
+
     const debouncedSearchQuery = useDebouncedValue(searchQuery, 300); // wait 300ms after typing
     const debouncedFilterYearRange = useDebouncedValue(filterYearRange, 300); // 300ms delay
     const debouncedFilterYear  = useDebouncedValue(filterYear, 300);
     const debouncedFilterAge  = useDebouncedValue(filterAge, 300);
+
+    // 1) memoize the Set of IDs
+    const idSet = useMemo(() => {
+        return attributeMatchIds.length > 0
+          ? new Set(attributeMatchIds)
+          : null;
+    }, [attributeMatchIds]);
 
     // filter + sort humans
     const notableHumans = useMemo(() => {
@@ -84,6 +120,11 @@ function App() {
             ...h,
             ...(articleMetadata[h.id] || {})
           }));
+        }
+
+        // ATTRIBUTE FILTER FIRST: only keep those server-matched IDs
+        if (idSet) {
+          humans = humans.filter(h => idSet.has(h.id));
         }
 
         // 1) search-by-name
@@ -246,7 +287,7 @@ function App() {
             : age === debouncedFilterAge;
         });
 
-        // 3) Sort
+        // 4) Sort
         humans.sort(sortHumansComparator(sortBy, sortAsc));
         return humans;
     }, [
@@ -254,7 +295,41 @@ function App() {
     debouncedSearchQuery,
     sortBy, sortAsc,
     dateFilterType, filterMonth, filterDay, debouncedFilterYear, debouncedFilterYearRange,
-    filterAgeType, debouncedFilterAge,
+    filterAgeType, debouncedFilterAge, idSet
+    ]);
+
+    useEffect(() => {
+      // Wait a bit after notableHumans change, to ensure filtering has settled
+      const timeoutId = setTimeout(() => {
+        const summary = generateFilterSummary({
+          searchQuery,
+          dateFilterType,
+          filterYear,
+          filterYearRange,
+          filterMonth,
+          filterDay,
+          attributeFilters,
+          filterAge,
+          filterAgeType,
+          resultsCount: notableHumans.length,
+        });
+        setFilterSummary(summary);
+        console.log(summary);
+      }, 350); // slightly longer than your debounce times (300ms)
+
+      // cleanup to prevent multiple calls stacking
+      return () => clearTimeout(timeoutId);
+    }, [
+      notableHumans, // rely on notableHumans directly
+      searchQuery,
+      dateFilterType,
+      filterYear,
+      filterYearRange,
+      filterMonth,
+      filterDay,
+      attributeFilters,
+      filterAge,
+      filterAgeType
     ]);
 
     // ← Build a `filters` object with every single value & setter
@@ -269,10 +344,11 @@ function App() {
         filterDay,    setFilterDay,
         filterAgeType,  setFilterAgeType,
         filterAge,      setFilterAge,
+        attributeFilters, setAttributeFilters
     }), [
         searchQuery, sortBy, sortAsc,
         dateFilterType, filterMonth, filterDay, filterYear, filterYearRange,
-        filterAgeType, filterAge,
+        filterAgeType, filterAge, attributeFilters
     ]);
 
     if (globeState.dataLoadError) {

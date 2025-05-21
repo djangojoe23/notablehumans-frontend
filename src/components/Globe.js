@@ -4,7 +4,7 @@ import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@mui/material/styles';
 
-
+import { SIDEBAR_WIDTH } from '../constants/layout';
 import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
 import updateClusterVisualStates from "../utils/updateClusterVisualStates";
 import { updateHaloForDetailedHuman, activateHaloForUnclustered} from '../utils/haloUtils';
@@ -24,7 +24,7 @@ const buildFilteredGeoJSON = (notableHumans) => ({
   })),
 });
 
-const Globe = ({ notableHumans = [], filters, ...globeState }) => {
+const Globe = ({ notableHumans = [], filters, filterSummary, ...globeState }) => {
   const theme = useTheme();
   const containerRef = useRef(null);
   const popupRef = useRef(null);
@@ -355,6 +355,38 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
   return (
     <Box position="relative" width="100%" height="100%">
       <Box
+        sx={{
+          position: 'absolute',
+          top: 10,
+          left: globeState.sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
+          right: 0,
+          transition: 'left 300ms ease-in-out',
+          display: 'flex',
+          justifyContent: 'center',
+          pointerEvents: 'none',
+          zIndex: 10,
+        }}
+      >
+        <Box
+          sx={{
+            backgroundColor: 'rgba(255,255,255,0.85)',
+            padding: '6px 12px',
+            borderRadius: '4px',
+            boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+            fontSize: '13px',
+            fontFamily: 'Roboto, sans-serif',
+            pointerEvents: 'none',
+            maxWidth: '100%',
+            whiteSpace: 'pre-wrap',
+            textAlign: 'center',
+            wordBreak: 'break-word',
+          }}
+        >
+          {filterSummary}
+        </Box>
+      </Box>
+
+      <Box
         ref={containerRef}
         position="absolute"
         top={0}
@@ -363,6 +395,7 @@ const Globe = ({ notableHumans = [], filters, ...globeState }) => {
         bottom={0}
       />
     </Box>
+
   );
 
 };

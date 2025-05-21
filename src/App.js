@@ -314,7 +314,6 @@ function App() {
           resultsCount: notableHumans.length,
         });
         setFilterSummary(summary);
-        console.log(summary);
       }, 350); // slightly longer than your debounce times (300ms)
 
       // cleanup to prevent multiple calls stacking
@@ -380,7 +379,9 @@ function App() {
     <Box display="flex" flexDirection="column" height="100vh" overflow="hidden">
       <Header />
       <Box position="relative" flex={1} overflow="hidden">
-        <Globe {...globeState} filters={filters} notableHumans={notableHumans} />
+
+        <Globe {...globeState} filters={filters} filterSummary={filterSummary} notableHumans={notableHumans} />
+
         <Sidebar
             {...globeState}
             filters={filters}

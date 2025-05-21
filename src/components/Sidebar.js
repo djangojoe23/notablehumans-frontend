@@ -23,7 +23,6 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
 
   const [activeTab, setActiveTab] = useState('browse');
 
-
   const getItemSize = () => 36; // fixed row height for now
 
   const handleRowClick = async (human) => {
@@ -186,15 +185,15 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
         }}
       >
         {/* HEADER + TABS */}
-        <Box px={2} py={1}>
-          <Typography variant="subtitle1" fontWeight="bold">
-            All Notable Humans ({notableHumans.length})
-          </Typography>
-        </Box>
+        {/*<Box px={2} py={1}>*/}
+        {/*  <Typography variant="subtitle1" fontWeight="bold">*/}
+        {/*    All Notable Humans ({notableHumans.length})*/}
+        {/*  </Typography>*/}
+        {/*</Box>*/}
 
         {/* Tab Content */}
-        <Box display="flex" flexDirection="column" flex={1} minHeight={0}>
-          {/* BROWSE TAB: search/sort is inside Filter(mode='browse') */}'
+        <Box display="flex" flexDirection="column" flex={1} minHeight={0} sx={{mt: 1}}>
+          {/* BROWSE TAB: search/sort is inside Filter(mode='browse') */}
           {activeTab === 'browse' && (
           <>
             <Filter mode="browse" {...filters} />

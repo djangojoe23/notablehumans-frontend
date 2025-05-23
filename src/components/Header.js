@@ -90,6 +90,13 @@ const Header = () => {
             >
               Doing Math
             </MenuItem>
+            <MenuItem
+              component="a"
+              href="/projects"
+              onClick={closeProjectsMenu}
+            >
+              Movement
+            </MenuItem>
           </Menu>
 
           <Button

@@ -10,7 +10,7 @@ import { useFilterState } from './hooks/useFilterState';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { sortHumansComparator } from './utils/sortHumans';
 import { generateFilterSummary } from './utils/filterSummary';
-
+import { parseYMD } from './utils/format';
 
 
 // Helper to construct dates correctly even for ancient years
@@ -136,16 +136,10 @@ function App() {
         // 2) date filtering (born/died/alive)
         humans = humans.filter(h => {
           // parse birth
-          let by = h.by;
-          let bm = null;
-          let bd = null;
-          if (h.bd) [by, bm, bd] = h.bd.split('-').map(n => parseInt(n, 10));
+          const { year: by, month: bm, day: bd } = parseYMD(h.bd);
 
           // parse death
-          let dy = h.dy;
-          let dm = null;
-          let dd = null;
-          if (h.dd) [dy, dm, dd] = h.dd.split('-').map(n => parseInt(n, 10));
+          const { year: dy, month: dm, day: dd } = parseYMD(h.dd);
 
           const y0 = debouncedFilterYear;
           const r  = debouncedFilterYearRange;
@@ -258,16 +252,18 @@ function App() {
         // 2) lived‑to‑be filter
         humans = humans.filter(h => {
           if (debouncedFilterAge == null) return true;        // no age filter → keep all
-          // parse birth
-          const [by, bm = 1, bd = 1] = h.bd
-            ? h.bd.split('-').map(n => +n)
-            : [null, null, null];
+
+          // --- parse birth with optional leading “-” ---
+          const { year: by, month: bm, day: bd } = parseYMD(h.bd);
           if (by == null) return false;
 
+          // --- parse death with optional leading “-” ---
+          const { year: dy, month: dm, day: dd } = parseYMD(h.dd);
+
+          // compute age
           let age;
-          if (h.dd) {
+          if (dy != null) {
             // died → age at death
-            const [dy, dm = 1, dd] = h.dd.split('-').map(n => +n);
             age = dy - by;
             if (dm < bm || (dm === bm && dd < bd)) age--;
           } else {
@@ -278,13 +274,13 @@ function App() {
                ((today.getUTCMonth()+1) === bm && today.getUTCDate() < bd)
                 ? 1
                 : 0);
-            // exact → exclude still‑living
-            if (filterAgeType === 'exact') return false;
+            if (filterAgeType === 'exact') return false;  // exact excludes still-living
           }
 
-          return filterAgeType === 'min'
-            ? age >= debouncedFilterAge
-            : age === debouncedFilterAge;
+          if (filterAgeType === 'min') return age >= debouncedFilterAge;
+          if (filterAgeType === 'exact') return age === debouncedFilterAge;
+          if (filterAgeType === 'max') return age <= debouncedFilterAge;
+          return true;
         });
 
         // 4) Sort

@@ -50,6 +50,9 @@ const Filter = ({
   const theme = useTheme();
   const [attributeOptions, setAttributeOptions] = useState({});
 
+  const [withinSign, setWithinSign] = useState('plus');  // 'plus' or 'minus'
+
+
   // load attribute options
   useEffect(() => {
     axios.get(`${process.env.REACT_APP_API_URL}/attributes-dict/`)
@@ -75,6 +78,23 @@ const Filter = ({
       setDateFilterType('born');
     }
   }, [dateFilterType, filterYear, setDateFilterType]);
+
+  useEffect(() => {
+    if (filterYearRange != null) {
+      setFilterYearRange(prev => {
+        const abs = Math.abs(prev);
+        return withinSign === 'minus' ? -abs : abs;
+      });
+    }
+  }, [withinSign]);
+
+  const [filterYearText, setFilterYearText] = useState(
+    filterYear != null ? String(filterYear) : ''
+  );
+
+  useEffect(() => {
+    setFilterYearText(filterYear != null ? String(filterYear) : '');
+  }, [filterYear]);
 
   const formatOption = o => o === '__MISSING__' ? '(Not recorded)' : o;
 
@@ -196,13 +216,42 @@ const Filter = ({
                       placeholder="Year"
                       variant="outlined"
                       size="small"
-                      type="number"
-                      value={filterYear ?? ''}
-                      onChange={e => setFilterYear(e.target.value === '' ? null : +e.target.value)}
+                      type="text"
+                      autoComplete="off"
+                      value={filterYearText}
+                      onChange={e => {
+                        const raw = e.target.value;
+                        // allow empty, lone '-', or a (signed) integer
+                        if (raw === '' || raw === '-' || /^-?\d+$/.test(raw)) {
+                          setFilterYearText(raw);
+                          // only commit to filterYear when there's at least one digit:
+                          if (raw === '' || raw === '-') {
+                            setFilterYear(null);
+                          } else {
+                            setFilterYear(parseInt(raw, 10));
+                          }
+                        }
+                      }}
                       fullWidth
-                      sx={{
-                        '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': { WebkitAppearance: 'none' },
-                        '& input[type=number]': { MozAppearance: 'textfield' }
+                      slotProps={{
+                        htmlInput: {
+                          autoComplete: 'off',
+                          inputMode: 'numeric',
+                          pattern: '-?[0-9]*',
+                          onKeyDown: e => {
+                            const isMinus = e.key === '-';
+                            const isDigit = /^[0-9]$/.test(e.key);
+                            const isNav = ['Backspace','Delete','ArrowLeft','ArrowRight','Tab'].includes(e.key);
+                            // only allow one leading '-' and digits
+                            if (
+                              !isDigit &&
+                              !isNav &&
+                              !(isMinus && e.target.selectionStart === 0 && !e.target.value.includes('-'))
+                            ) {
+                              e.preventDefault();
+                            }
+                          }
+                        }
                       }}
                     />
                   </Tooltip>
@@ -210,25 +259,83 @@ const Filter = ({
               </Box>
 
               {/* Years Since Fieldset */}
-              <Box component="fieldset" sx={{ width: '100px', border: 1, borderColor: 'divider', borderRadius: 1, p: 1, px: 0.5, '& legend': { ...theme.typography.subtitle2, fontWeight: theme.typography.subtitle2.fontWeight + 100, lineHeight: 1.3 } }}>
-                <Box component="legend">Or Within the Following</Box>
+              <Box
+                component="fieldset"
+                sx={{
+                  width: '100px',
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                  px: 0,
+                  '& legend': {
+                    ...theme.typography.subtitle2,
+                    fontWeight: theme.typography.subtitle2.fontWeight + 100,
+                    lineHeight: 1.3,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0
+                  }
+                }}
+              >
+                <Box component="legend">
+                  Or Within
+                  <ToggleButtonGroup
+                    size="small"
+                    exclusive
+                    value={withinSign}
+                    onChange={(_, v) => v && setWithinSign(v)}
+                    sx={{ pl: 0.5 }}
+                  >
+                    <ToggleButton sx={{p:0.5}} value="plus">+</ToggleButton>
+                    <ToggleButton sx={{p:0.5}} value="minus">−</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+
                 <Tooltip title={filterYear == null ? "Enter year in date to enable" : ""} placement="top">
                   <span style={{ display: 'block' }}>
                     <TextField
                       placeholder="0"
                       variant="outlined"
                       size="small"
-                      type="number"
-                      value={filterYear == null ? '' : (filterYearRange ?? '')}
+                      type="text"
+                      value={filterYearRange != null ? Math.abs(filterYearRange) : ''}
                       onChange={e => {
                         const raw = e.target.value;
-                        const intVal = raw === '' ? null : Number.isNaN(parseInt(raw, 10)) ? filterYearRange : parseInt(raw, 10);
-                        setFilterYearRange(intVal);
+                        let val = raw === '' ? null : parseInt(raw, 10);
+                        if (val != null) {
+                          val = withinSign === 'minus' ? -Math.abs(val) : Math.abs(val);
+                        }
+                        setFilterYearRange(val);
                       }}
                       fullWidth
                       disabled={filterYear == null}
-                      slotProps={{ input: { endAdornment: <InputAdornment position="end">yrs</InputAdornment> }, htmlInput: { step: 1, inputMode: 'numeric', pattern: '-?[0-9]*' } }}
-                      sx={{ '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]': { MozAppearance: 'textfield' } }}
+                      slotProps={{
+                        htmlInput: {
+                          // only positive integers
+                          min: 0,
+                          step: 1,
+                          inputMode: 'numeric',
+                          pattern: '[0-9]*',
+                          onKeyDown: e => {
+                            // allow only digits and navigation keys
+                            if (
+                              e.key !== 'Backspace' &&
+                              e.key !== 'Delete' &&
+                              e.key !== 'ArrowLeft' &&
+                              e.key !== 'ArrowRight' &&
+                              !/^[0-9]$/.test(e.key)
+                            ) {
+                              e.preventDefault();
+                            }
+                          }
+                        },
+                        input: {
+                          // end adornment slot
+                          endAdornment: <InputAdornment position="end">yrs</InputAdornment>
+                        }
+                      }}
+                      sx={{ px: 0.5 }}
                     />
                   </span>
                 </Tooltip>
@@ -253,16 +360,35 @@ const Filter = ({
               >
                 <ToggleButton value="min">at least</ToggleButton>
                 <ToggleButton value="exact">exactly</ToggleButton>
+                <ToggleButton value="max">at most</ToggleButton>
               </ToggleButtonGroup>
               <TextField
                 placeholder=""
                 variant="outlined"
                 size="small"
-                type="number"
+                type="text"
                 value={filterAge ?? ''}
                 onChange={e => setFilterAge(e.target.value === '' ? null : +e.target.value)}
-                slotProps={{ htmlInput: { min: 0, step: 1, inputMode: 'numeric', pattern: '[0-9]*' } }}
-                sx={{ width: 60, '& input::-webkit-inner-spin-button, & input::-webkit-outer-spin-button': { WebkitAppearance: 'none' }, '& input[type=number]': { MozAppearance: 'textfield' } }}
+                sx={{ width: 60 }}
+                slotProps={{
+                  htmlInput: {
+                    min: 0,
+                    step: 1,
+                    inputMode: 'numeric',
+                    pattern: '[0-9]*',
+                    onKeyDown: e => {
+                      if (
+                        e.key !== 'Backspace' &&
+                        e.key !== 'Delete' &&
+                        e.key !== 'ArrowLeft' &&
+                        e.key !== 'ArrowRight' &&
+                        !/^[0-9]$/.test(e.key)
+                      ) {
+                        e.preventDefault();
+                      }
+                    }
+                  }
+                }}
               />
               <Typography variant="subtitle2">years old.</Typography>
             </Stack>

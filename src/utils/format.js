@@ -20,3 +20,14 @@ export const formatDate = (dateStr) => {
 
   return `${months[month]} ${day}, ${formatYear(year)}`;
 };
+
+export function parseYMD(dateStr) {
+  // Returns { year, month, day } or nulls if it doesn’t match
+  const m = /^(-?\d+)-(\d+)-(\d+)/.exec(dateStr || '');
+  if (!m) return { year: null, month: null, day: null };
+  return {
+    year:  parseInt(m[1], 10),
+    month: parseInt(m[2], 10),
+    day:   parseInt(m[3], 10),
+  };
+}

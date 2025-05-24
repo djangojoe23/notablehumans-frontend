@@ -1,5 +1,5 @@
 import React, {useEffect, useRef} from 'react';
-import { Box } from '@mui/material';
+import {Box, Typography} from '@mui/material';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { useTheme } from '@mui/material/styles';
@@ -24,7 +24,7 @@ const buildFilteredGeoJSON = (notableHumans) => ({
   })),
 });
 
-const Globe = ({ notableHumans = [], filters, filterSummary, ...globeState }) => {
+const Globe = ({ notableHumans = [], filters, filterClauses, ...globeState }) => {
   const theme = useTheme();
   const containerRef = useRef(null);
   const popupRef = useRef(null);
@@ -370,19 +370,33 @@ const Globe = ({ notableHumans = [], filters, filterSummary, ...globeState }) =>
         <Box
           sx={{
             backgroundColor: 'rgba(255,255,255,0.85)',
-            padding: '6px 12px',
-            borderRadius: '4px',
-            boxShadow: '0 1px 2px rgba(0,0,0,0.15)',
+            borderTop: `1px solid ${theme.palette.divider}`,
+            padding: 1,
+            borderRadius: 1,
+            boxShadow: 1,
             fontSize: '13px',
             fontFamily: 'Roboto, sans-serif',
             pointerEvents: 'none',
-            maxWidth: '100%',
-            whiteSpace: 'pre-wrap',
+            maxWidth: '85%',
+            whiteSpace: 'normal',
             textAlign: 'center',
-            wordBreak: 'break-word',
           }}
         >
-          {filterSummary}
+           {/* First clause on its own line */}
+            <Typography variant="h6" component="div" sx={{lineHeight: 1}}>
+              {filterClauses[0]}
+            </Typography>
+
+            {/* Remaining clauses joined with “and”, only if any */}
+            {filterClauses.length > 1 && (
+              <Typography
+                variant="body2"
+                component="div"
+                sx={{ mt: 0.5 }}
+              >
+                {filterClauses.slice(1).join(' and ')}
+              </Typography>
+            )}
         </Box>
       </Box>
 

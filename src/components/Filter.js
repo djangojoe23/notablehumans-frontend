@@ -180,7 +180,7 @@ const Filter = ({
                     <Tooltip title="Enter year to enable" placement="top">
                       <span>
                         <ToggleButton value="alive" disabled={!filterYear}>
-                          Alive On
+                          Alive
                         </ToggleButton>
                       </span>
                     </Tooltip>

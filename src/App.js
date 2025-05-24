@@ -9,7 +9,7 @@ import useGlobeState from './hooks/useGlobeState';
 import { useFilterState } from './hooks/useFilterState';
 import { useDebouncedValue } from './hooks/useDebouncedValue';
 import { sortHumansComparator } from './utils/sortHumans';
-import { generateFilterSummary } from './utils/filterSummary';
+import { getFilterClauses, generateFilterSummary } from './utils/filterSummary';
 import { parseYMD } from './utils/format';
 
 
@@ -25,7 +25,6 @@ const makeFilterDate = (year, month, day) => {
 function App() {
     const globeState = useGlobeState();
     const [articleMetadata, setArticleMetadata] = useState(null);
-    const [filterSummary, setFilterSummary] = useState('');
 
     const {
         searchQuery,    setSearchQuery,
@@ -40,6 +39,7 @@ function App() {
         filterAge,      setFilterAge,
         attributeFilters, setAttributeFilters
     } = useFilterState();
+
 
     // This will hold the list of IDs returned by your attribute-filter API
     const [attributeMatchIds, setAttributeMatchIds] = useState([]);
@@ -294,37 +294,53 @@ function App() {
     filterAgeType, debouncedFilterAge, idSet
     ]);
 
+    // Initialize summary & clauses
+    const initialParams = {
+        searchQuery, dateFilterType,
+        filterYear, filterYearRange,
+        filterMonth, filterDay,
+        filterAge, filterAgeType,
+        attributeFilters,
+        resultsCount: notableHumans.length,
+    };
+    const [filterSummary, setFilterSummary] = useState(
+        generateFilterSummary(initialParams)
+    );
+    const [filterClauses, setFilterClauses] = useState(
+        getFilterClauses(initialParams)
+    );
+
     useEffect(() => {
-      // Wait a bit after notableHumans change, to ensure filtering has settled
       const timeoutId = setTimeout(() => {
-        const summary = generateFilterSummary({
+        const params = {
           searchQuery,
           dateFilterType,
           filterYear,
           filterYearRange,
           filterMonth,
           filterDay,
-          attributeFilters,
           filterAge,
           filterAgeType,
+          attributeFilters,
           resultsCount: notableHumans.length,
-        });
-        setFilterSummary(summary);
-      }, 350); // slightly longer than your debounce times (300ms)
+        };
 
-      // cleanup to prevent multiple calls stacking
+        setFilterSummary(generateFilterSummary(params));
+        setFilterClauses(getFilterClauses(params));
+      }, 350);
+
       return () => clearTimeout(timeoutId);
     }, [
-      notableHumans, // rely on notableHumans directly
+      notableHumans.length,
       searchQuery,
       dateFilterType,
       filterYear,
       filterYearRange,
       filterMonth,
       filterDay,
-      attributeFilters,
       filterAge,
-      filterAgeType
+      filterAgeType,
+      attributeFilters,
     ]);
 
     // ← Build a `filters` object with every single value & setter
@@ -376,7 +392,7 @@ function App() {
       <Header />
       <Box position="relative" flex={1} overflow="hidden">
 
-        <Globe {...globeState} filters={filters} filterSummary={filterSummary} notableHumans={notableHumans} />
+        <Globe {...globeState} filters={filters} filterClauses={filterClauses} notableHumans={notableHumans} />
 
         <Sidebar
             {...globeState}

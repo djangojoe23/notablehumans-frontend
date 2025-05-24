@@ -41,23 +41,42 @@ function buildDateLabel({ year, month, day }) {
   return null;
 }
 
-export const generateFilterSummary = ({
+export function getFilterClauses({
   searchQuery,
   dateFilterType,
   filterYear,
   filterYearRange,
   filterMonth,
   filterDay,
+  filterAge,
+  filterAgeType,
+  attributeFilters,
   resultsCount,
-}) => {
-  const plural = resultsCount === 1 ? 'notable human' : 'notable humans';
+}) {
   const verb = resultsCount === 1 ? 'was' : 'were';
   const diedVerb = resultsCount === 1 ? 'has died' : 'have died';
-  const phrases = [];
+  const plural = resultsCount === 1 ? 'notable human' : 'notable humans';
+  const phrases = [`${resultsCount} ${plural}`];
 
   // Name filter
   if (searchQuery?.trim()) {
     phrases.push(`whose name contains "${searchQuery.trim()}"`);
+  }
+
+  // Age filter
+  if (filterAge != null && filterAgeType) {
+    let ageLabel;
+    switch (filterAgeType) {
+      case 'min':
+        ageLabel = 'at least';
+        break;
+      case 'max':
+        ageLabel = 'at most';
+        break;
+      default:
+        ageLabel = 'exactly';
+    }
+    phrases.push(`who lived to be ${ageLabel} ${filterAge} years old`);
   }
 
   // Date filter
@@ -114,9 +133,35 @@ export const generateFilterSummary = ({
     }
   }
 
+  // Attribute filters
+  if (Array.isArray(attributeFilters) && attributeFilters.length > 0) {
+    attributeFilters.forEach(({ attribute, matchType, values }) => {
+      if (values?.length) {
+        // Clean attribute name
+        const labelAttr = attribute.replace(/_/g, ' ');
+        // Build values string with proper conjunction
+        let valsStr;
+        if (values.length === 1) {
+          valsStr = values[0];
+        } else {
+          const conj = matchType === 'all' ? ' and ' : ' or ';
+          valsStr = values.slice(0, -1).join(', ') + conj + values[values.length - 1];
+        }
+        phrases.push(`whose "${labelAttr}" attribute includes ${valsStr}`);
+      }
+    });
+  }
+
+  return phrases
+}
+
+export function generateFilterSummary(params) {
+  const phrases = getFilterClauses(params);
+  const { resultsCount } = params;
+  const plural = resultsCount === 1 ? 'notable human' : 'notable humans';
+
   if (phrases.length === 0) {
     return `${resultsCount} ${plural}`;
   }
-
   return `${resultsCount} ${plural} ${phrases.join(' and ')}`;
-};
+}

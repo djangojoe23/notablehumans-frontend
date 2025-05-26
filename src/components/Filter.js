@@ -28,6 +28,8 @@ const Filter = ({
   setSortBy,
   sortAsc,
   setSortAsc,
+  nameMatchType,
+  setNameMatchType,
   searchQuery,
   setSearchQuery,
   dateFilterType,
@@ -104,13 +106,48 @@ const Filter = ({
         {mode === 'browse' && (
           <>
             {/* Search */}
-            <TextField
-              label="Search by Name"
-              size="small"
-              value={searchQuery}
-              onChange={e => setSearchQuery(e.target.value)}
-              fullWidth
-            />
+            <Box>
+              <Box
+                component="fieldset"
+                sx={{
+                  flex: 1,
+                  border: 1,
+                  borderColor: 'divider',
+                  borderRadius: 1,
+                  p: 1,
+                    px: 0.5,
+                  '& legend': {}
+                }}
+              >
+                <Box component="legend">
+                  <ToggleButtonGroup
+                    value={nameMatchType}
+                    exclusive
+                    size="small"
+                    onChange={(_, v) => v && setNameMatchType(v)}
+                    sx={{
+                      '& .MuiToggleButton-root': {
+                        ...theme.typography.subtitle2,
+                        textTransform: 'none'
+                      },
+                      '& .Mui-selected': {
+                        fontWeight: theme.typography.subtitle2.fontWeight + 100
+                      }
+                    }}
+                  >
+                    <ToggleButton value="startswith">Starts with</ToggleButton>
+                    <ToggleButton value="contains">Contains</ToggleButton>
+                  </ToggleButtonGroup>
+                </Box>
+                <TextField
+                  label="Search by name"
+                  size="small"
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  fullWidth
+                />
+              </Box>
+            </Box>
 
             {/* Sort */}
             <Box component="fieldset" sx={{

@@ -389,12 +389,38 @@ const Globe = ({ notableHumans = [], filters, filterClauses, ...globeState }) =>
 
             {/* Remaining clauses joined with “and”, only if any */}
             {filterClauses.length > 1 && (
-              <Typography
-                variant="body2"
-                component="div"
-                sx={{ mt: 0.5 }}
-              >
-                {filterClauses.slice(1).join(' and ')}
+              <Typography variant="body2" component="div" sx={{ mt: 0.5, fontSize: '1.1em' }}>
+                {filterClauses.slice(1).map((clause, idx) => {
+                  // split into “[prefix]includes” and the values string
+                  const [prefix, valuesStr] = clause.split(/includes\s+/);
+                  // if it’s not an “includes” clause, render it as-is
+                  if (valuesStr == null) {
+                    return (
+                      <React.Fragment key={idx}>
+                        {clause}
+                        {idx < filterClauses.length - 2 && ' and '}
+                      </React.Fragment>
+                    );
+                  }
+
+                  // now split valuesStr on " and " or " or ", keeping the separators
+                  const parts = valuesStr.split(/(\s(?:and|or)\s)/);
+
+                  return (
+                    <React.Fragment key={idx}>
+                      {prefix}includes{' '}
+                      {parts.map((part, i) => {
+                        // if this part *is* “ and ” or “ or ”, render plain
+                        if (/^( and | or )$/.test(part)) {
+                          return <span key={i}>{part}</span>;
+                        }
+                        // otherwise it’s a value—italicize
+                        return <em key={i}>{part}</em>;
+                      })}
+                      {idx < filterClauses.length - 2 && ' and '}
+                    </React.Fragment>
+                  );
+                })}
               </Typography>
             )}
         </Box>

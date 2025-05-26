@@ -149,7 +149,7 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
         listRef.current.scrollToItem(index, 'auto');
       }, 300);
     }
-  }, [globeState.detailedHuman, globeState.sidebarOpen, notableHumans]);
+  }, [globeState.detailedHuman, globeState.sidebarOpen]);
 
   const scrollToPerson = (person) => {
     const index = notableHumans.findIndex((h) => h.id === person.id);
@@ -184,12 +184,6 @@ const Sidebar = ({ notableHumans = [], filters, ...globeState }) => {
           pointerEvents: 'auto',
         }}
       >
-        {/* HEADER + TABS */}
-        {/*<Box px={2} py={1}>*/}
-        {/*  <Typography variant="subtitle1" fontWeight="bold">*/}
-        {/*    All Notable Humans ({notableHumans.length})*/}
-        {/*  </Typography>*/}
-        {/*</Box>*/}
 
         {/* Tab Content */}
         <Box display="flex" flexDirection="column" flex={1} minHeight={0} sx={{mt: 1}}>

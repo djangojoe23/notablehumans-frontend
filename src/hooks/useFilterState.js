@@ -2,6 +2,7 @@
 import { useState } from 'react';
 
 export const useFilterState = () => {
+  const [nameMatchType, setNameMatchType] = useState('startswith');
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('n');
   const [sortAsc, setSortAsc] = useState(true);
@@ -20,6 +21,7 @@ export const useFilterState = () => {
   ]);
 
   return {
+    nameMatchType, setNameMatchType,
     searchQuery, setSearchQuery,
     sortBy, setSortBy,
     sortAsc, setSortAsc,

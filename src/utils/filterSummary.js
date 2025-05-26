@@ -42,6 +42,7 @@ function buildDateLabel({ year, month, day }) {
 }
 
 export function getFilterClauses({
+  nameMatchType,
   searchQuery,
   dateFilterType,
   filterYear,
@@ -58,9 +59,10 @@ export function getFilterClauses({
   const plural = resultsCount === 1 ? 'notable human' : 'notable humans';
   const phrases = [`${resultsCount} ${plural}`];
 
-  // Name filter
+  // Name filter: contains vs starts with
   if (searchQuery?.trim()) {
-    phrases.push(`whose name contains "${searchQuery.trim()}"`);
+    const mode = nameMatchType === 'startswith' ? 'starts with' : 'contains';
+    phrases.push(`whose name ${mode} "${searchQuery.trim()}"`);
   }
 
   // Age filter

@@ -23,34 +23,60 @@ const Header = () => {
   return (
     <AppBar
       position="static"
-      sx={{ height: 60, backgroundColor: '#333' }}
+      sx={{ backgroundColor: '#333' }}
     >
-      <Toolbar sx={{ minHeight: 60, px: 2 }}>
-        {/* Title on the left */}
+      <Toolbar
+        sx={{
+          // Let items wrap onto new lines when there isn't enough horizontal space
+          flexWrap: 'wrap',
+          minHeight: 60,
+          px: 2,
+        }}
+      >
+        {/* Title (always fully visible; will wrap if absolutely needed) */}
         <Typography
           variant="h3"
           component="div"
           sx={{
-            fontFamily: `'Clematis Modern', serif`,
+            fontFamily: `'Ubuntu', serif`,
             letterSpacing: '0.03em',
+            // Never shrink this text—keep it fully visible
+            flexShrink: 0,
+            // Responsive font-size: 2rem on md+, 1.5rem on sm, 1.25rem on xs
+            fontSize: {
+              xs: '1.25rem',
+              sm: '1.5rem',
+              md: '2rem'
+            },
+            // Allow wrapping onto a second line if that's the only way
+            whiteSpace: 'normal',
+            wordBreak: 'break-word',
           }}
         >
           The Compulsive Rambler
         </Typography>
 
-        {/* Nav items pushed right */}
+        {/* Nav items (About / Projects / Contact) */}
         <Box
           sx={{
             ml: 'auto',
             display: 'flex',
             alignItems: 'center',
             gap: 2,
+
+            // Let this box wrap its buttons if needed
+            flexWrap: 'wrap',
           }}
         >
           <Button
             color="inherit"
             component="a"
             href="/about"
+            sx={{
+              // Shrink button text responsively on smaller screens
+              fontSize: { xs: '0.6rem', sm: '0.8rem', md: '1rem' },
+              paddingX: { xs: 0.5, sm: 1, md: 1.5 },
+            }}
           >
             About
           </Button>
@@ -58,7 +84,11 @@ const Header = () => {
           <Button
             color="inherit"
             onClick={openProjectsMenu}
-            endIcon={<ArrowDropDownIcon />}
+            endIcon={<ArrowDropDownIcon fontSize="small" />}
+            sx={{
+              fontSize: { xs: '0.6rem', sm: '0.8rem', md: '1rem' },
+              paddingX: { xs: 0.5, sm: 1, md: 1.5 },
+            }}
           >
             Projects
           </Button>
@@ -103,6 +133,10 @@ const Header = () => {
             color="inherit"
             component="a"
             href="/contact"
+            sx={{
+              fontSize: { xs: '0.6rem', sm: '0.8rem', md: '1rem' },
+              paddingX: { xs: 0.5, sm: 1, md: 1.5 },
+            }}
           >
             Contact
           </Button>

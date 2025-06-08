@@ -1,443 +1,424 @@
-import React, {useEffect, useRef} from 'react';
-import {Box, Typography} from '@mui/material';
+import React, {useEffect, useRef, useCallback} from 'react';
+
+import {Box} from '@mui/material';
+import {useTheme} from "@mui/material/styles";
+
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { useTheme } from '@mui/material/styles';
 
-import { SIDEBAR_WIDTH } from '../constants/layout';
-import useSidebarGlobePadding from '../hooks/useSidebarGlobePadding';
-import updateClusterVisualStates from "../utils/updateClusterVisualStates";
-import { updateHaloForDetailedHuman, activateHaloForUnclustered} from '../utils/haloUtils';
-import { buildClusterPopup } from '../utils/clusterPopup';
-
-const buildFilteredGeoJSON = (notableHumans) => ({
-  type: 'FeatureCollection',
-  features: notableHumans.map(person => ({
-    type: 'Feature',
-    geometry: {
-      type: 'Point',
-      coordinates: [person.lng, person.lat],
-    },
-    properties: {
-      ...person,
-    },
-  })),
-});
-
-const Globe = ({ notableHumans = [], filters, filterClauses, ...globeState }) => {
-  const theme = useTheme();
-  const containerRef = useRef(null);
-  const popupRef = useRef(null);
-  const clusterWithPopupRef = useRef({ clusterId: null, lngLat: null, totalCount: 0 });
+import FilterSummary from './FilterSummary'
+import { buildClusterPopup, closePopup, matchesFilter } from "../utils/clusterPopup";
 
 
-  useEffect(() => {
-    if (!containerRef.current || !globeState.notableHumanData) return;
+const Globe = ({humans, globeState, filterState, filteredHumansIdSet, SIDEBAR_WIDTH}) => {
+    const theme = useTheme();
+    const containerRef = useRef(null);
+    const popupRef = useRef(null);
+    const popupListDivRef = useRef(null); //DOM node for your scrolling list inside cluster popup
+    const clusterContextRef = useRef(null); //the cluster that currently has a popup open
+    const lastZoomRef = useRef(null);
 
-    const globe = new mapboxgl.Map({
-      container: containerRef.current,
-      style: `mapbox://styles/${process.env.REACT_APP_MAPBOX_USER}/${process.env.REACT_APP_MAPBOX_STYLE_ID}`,
-      accessToken: process.env.REACT_APP_MAPBOX_API_TOKEN,
-      center: [0, 0],
-      zoom: 2,
-      minZoom: 2,
-      maxZoom: 16,
-      projection: 'globe',
-    });
-
-    globeState.globeRef.current = globe;
-
-    globe.on('load', () => {
-      globe.addSource('humans', {
-        type: 'geojson',
-        data: globeState.notableHumanData,
-        cluster: true,
-        clusterMaxZoom: 16,
-        clusterRadius: 50,
-      });
-
-      globe.addLayer({
-        id: 'clusters',
-        type: 'circle',
-        source: 'humans',
-        filter: ['has', 'point_count'],
-        paint: {
-          'circle-color': theme.palette.primary.main,
-          'circle-stroke-color': [
-            'case',
-            ['boolean', ['feature-state', 'fullyOverlapping'], false],
-            '#666',
-            'transparent'
-          ],
-          'circle-stroke-width': [
-            'case',
-            ['boolean', ['feature-state', 'fullyOverlapping'], false],
-            2,
-            0
-          ],
-          'circle-radius': [
-            'step',
-            ['get', 'point_count'],
-            15, 10,
-            20, 30,
-            25,
-          ],
-        },
-      });
-
-      globe.addLayer({
-        id: 'cluster-count',
-        type: 'symbol',
-        source: 'humans',
-        filter: ['has', 'point_count'],
-        layout: {
-          'text-field': ['get', 'point_count_abbreviated'],
-          'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
-          'text-size': 12,
-          'text-anchor': 'center',
-          'text-offset': [-0.05, 0.15],
-        },
-        paint: {
-          'text-color': '#444',
-        },
-      });
-
-      globe.addLayer({
-        id: 'unclustered-point',
-        type: 'circle',
-        source: 'humans',
-        filter: ['!', ['has', 'point_count']],
-        paint: {
-          'circle-color': theme.palette.primary.main,
-          'circle-radius': 10,
-          'circle-stroke-width': 2,
-          'circle-stroke-color': '#666'
-        },
-      });
-
-      globe.addLayer({
-        id: 'singleton-count',
-        type: 'symbol',
-        source: 'humans',
-        filter: ['!', ['has', 'point_count']],
-        layout: {
-          'text-field': '1',
-          'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
-          'text-size': 10,
-          'text-anchor': 'center',
-          'text-offset': [0, 0.15],
-          'text-ignore-placement': true,
-          'text-allow-overlap': true,
-        },
-        paint: {
-          'text-color': '#444',
-        },
-      });
-
-      globe.addSource('halo', {
-        type: 'geojson',
-        data: {
-          type: 'FeatureCollection',
-          features: []
-        }
-      });
-
-      globe.addLayer({
-        id: 'halo-layer',
-        type: 'circle',
-        source: 'halo',
-        paint: {
-          'circle-radius': ['+', ['get', 'baseRadius'], ['get', 'pulseOffset']],
-          'circle-color': theme.palette.primary.main,
-          'circle-opacity': 0.5,
-          'circle-stroke-color': 'rgba(255, 255, 255, 0.8)',
-          'circle-stroke-width': 2
-        }
-      });
-
-      globe.once('idle', () => {
-        updateClusterVisualStates(globe);
-      });
-
-      globe.on('moveend', () => {
-        setTimeout(() => updateClusterVisualStates(globe), 250);
-      });
-
-      globe.on('click', 'unclustered-point', (e) => {
-        const feature = e.features?.[0];
-        if (!feature) return;
-
-        const coordinates = feature.geometry.coordinates;
-        const human = {
-          ...feature.properties,
-          lat: coordinates[1],
-          lng: coordinates[0],
+    // Helper to rebuild the existing popup on sort/filter change
+    const rebuildClusterPopup = useCallback(() => {
+        if (!popupRef.current || !clusterContextRef.current) return;
+        const { clusterId, lngLat, singletonFeature, totalCount } = clusterContextRef.current;
+        // build a fake feature for singleton or cluster
+        const feature = singletonFeature
+            ? singletonFeature
+            : {
+                properties: { cluster_id: clusterId, point_count: totalCount },
+                geometry: { coordinates: lngLat }
+              };
+        const fakeEvent = {
+            features: [feature],
+            lngLat: { lng: lngLat[0], lat: lngLat[1] }
         };
-
-        globeState.justClickedUnclusteredRef.current = true;
-        globeState.setDetailedHuman(human);
-
-        if (!globeState.sidebarOpenRef.current) {
-          globeState.setSidebarOpen(true);
-        }
-        // Activate halo immediately for better click responsiveness
-        activateHaloForUnclustered(globe, feature, globeState);
-      });
-
-      globe.on('click', 'clusters', (e) => {
-        const feature   = e.features[0];
-        const clusterId = feature.properties.cluster_id;
-        const [clusterLng, clusterLat] = feature.geometry.coordinates;
-        const lngLat     = [clusterLng, clusterLat];
-        const totalCount = feature.properties.point_count;
-
-        clusterWithPopupRef.current = { clusterId, lngLat, totalCount };
-
         buildClusterPopup(
-          globe,
-          globeState,
-          popupRef,
-          clusterId,
-          lngLat,
-          totalCount,
-          filters.sortBy,
-          filters.sortAsc
+            fakeEvent,
+            clusterContextRef,
+            popupRef,
+            popupListDivRef,
+            globeState,
+            filterState,
+            filteredHumansIdSet
         );
-      });
+    }, [filterState.sortBy, filterState.sortAsc, filteredHumansIdSet]);
 
-      globe.on('click', (e) => {
-        const features = globe.queryRenderedFeatures(e.point, {
-          layers: ['clusters', 'unclustered-point'],
+    // Set up the Globe
+    useEffect(() => {
+        if (!containerRef.current || !globeState.geojsonData || globeState.globeRef.current) return;
+
+        globeState.globeRef.current = new mapboxgl.Map({
+            container: containerRef.current,
+            style: `mapbox://styles/${process.env.REACT_APP_MAPBOX_USER}/${process.env.REACT_APP_MAPBOX_STYLE_ID}`,
+            accessToken: process.env.REACT_APP_MAPBOX_API_TOKEN,
+            center: [0, 0],
+            zoom: 2,
+            minZoom: 2,
+            maxZoom: 16,
+            projection: 'globe',
+            doubleClickZoom: false
         });
 
-        if (features.length === 0 && popupRef.current) {
-          // Clicked on empty map, not on cluster or unclustered point
-          popupRef.current.remove();
-          popupRef.current = null;
-          clusterWithPopupRef.current = { clusterId: null, lngLat: null, totalCount: 0 };
-        }
-      });
+        lastZoomRef.current = globeState.globeRef.current.getZoom();
 
-      globe.on('mouseenter', 'clusters', () => {
-        globe.getCanvas().style.cursor = 'pointer';
-      });
+        globeState.globeRef.current.on('load', () => {
+            globeState.globeRef.current.addSource(
+                'humans', {
+                    type: 'geojson',
+                    data: globeState.geojsonData,
+                    cluster: true,
+                    clusterMaxZoom: 16,
+                    clusterRadius: 50,
+                }
+            );
 
-      globe.on('mouseleave', 'clusters', () => {
-        globe.getCanvas().style.cursor = '';
-      });
+            globeState.globeRef.current.addLayer({
+                id: 'clusters',
+                type: 'circle',
+                source: 'humans',
+                filter: ['has', 'point_count'],
+                paint: {
+                    'circle-color': theme.palette.primary.main,
+                    'circle-stroke-color': [
+                        'case',
+                        ['boolean', ['feature-state', 'fullyOverlapping'], false],
+                        '#666',
+                        'transparent'
+                    ],
+                    'circle-stroke-width': [
+                        'case',
+                        ['boolean', ['feature-state', 'fullyOverlapping'], false],
+                        2,
+                        0
+                    ],
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'point_count'],
+                        1, 11,   // count=1 → 12px
+                        100, 30,   // count=50 → 25px
+                        1000, 40,    // count=200 → 50px
+                        10000, 50,
+                    ]
+                },
+            });
 
-      globe.on('mouseenter', 'unclustered-point', () => {
-        globe.getCanvas().style.cursor = 'pointer';
-      });
+            globeState.globeRef.current.addLayer({
+                id: 'cluster-count',
+                type: 'symbol',
+                source: 'humans',
+                filter: ['has', 'point_count'],
+                layout: {
+                    'text-field': ['get', 'point_count_abbreviated'],
+                    'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 12,
+                    'text-anchor': 'center',
+                    'text-offset': [-0.05, 0.15],
+                },
+                paint: {
+                    'text-color': '#444',
+                },
+            });
 
-      globe.on('mouseleave', 'unclustered-point', () => {
-        globe.getCanvas().style.cursor = '';
-      });
-    });
+            globeState.globeRef.current.addLayer({
+                id: 'singletons',
+                type: 'circle',
+                source: 'humans',
+                filter: ['!', ['has', 'point_count']],
+                paint: {
+                    'circle-color': theme.palette.primary.main,
+                    'circle-radius': 8,
+                },
+            });
 
-    const handleResize = () => globe.resize();
-    window.addEventListener('resize', handleResize);
+            globeState.globeRef.current.addLayer({
+                id: 'singleton-count',
+                type: 'symbol',
+                source: 'humans',
+                filter: ['!', ['has', 'point_count']],
+                layout: {
+                    'text-field': '1',
+                    'text-font': ['Ubuntu Medium', 'Arial Unicode MS Bold'],
+                    'text-size': 10,
+                    'text-anchor': 'center',
+                    'text-offset': [0, 0.15],
+                    'text-ignore-placement': true,
+                    'text-allow-overlap': true,
+                },
+                paint: {
+                    'text-color': '#444',
+                },
+            });
 
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      globe.remove();
-      globeState.globeRef.current = null;
-    };
-  }, [globeState.notableHumanData]);
+            globeState.globeRef.current.on('click', 'clusters', (e) => {
+                buildClusterPopup(
+                    e,
+                    clusterContextRef,
+                    popupRef,
+                    popupListDivRef,
+                    globeState,
+                    filterState,
+                    filteredHumansIdSet
+                )
+            });
 
-  useSidebarGlobePadding({
-    globeRef: globeState.globeRef,
-    sidebarOpen: globeState.sidebarOpen,
-  });
+            globeState.globeRef.current.on('click', 'singletons', (e) => {
+                buildClusterPopup(
+                    e,
+                    clusterContextRef,
+                    popupRef,
+                    popupListDivRef,
+                    globeState,
+                    filterState,
+                    filteredHumansIdSet
+                )
+            });
 
-  useEffect(() => {
-    const globe = globeState.globeRef.current;
-    if (!globe) return;
+            globeState.globeRef.current.on('click', (e) => {
+                const features = globeState.globeRef.current.queryRenderedFeatures(e.point, {
+                    layers: ['clusters', 'singletons'],
+                });
 
-    const source = globe.getSource('humans');
-    if (!source) return;
+                if (features.length === 0 && popupRef.current) {
+                    // Clicked on empty map, not on cluster or unclustered point
+                    popupRef.current.remove();
+                    popupRef.current = null;
+                    // clusterWithPopupRef.current = { clusterId: null, lngLat: null, totalCount: 0 };
+                }
+            });
 
-    const filteredGeoJSON = buildFilteredGeoJSON(notableHumans);
-    source.setData(filteredGeoJSON);
-  }, [notableHumans]);
+            globeState.globeRef.current.on('mouseenter', 'clusters', () => {
+                globeState.globeRef.current.getCanvas().style.cursor = 'pointer';
+            });
 
-  useEffect(() => {
-    if (popupRef.current) {
-      popupRef.current.remove();
-      popupRef.current = null;
-      clusterWithPopupRef.current = { clusterId: null, lngLat: null, totalCount: 0 };
-    }
-  }, [notableHumans]);
+            globeState.globeRef.current.on('mouseleave', 'clusters', () => {
+                globeState.globeRef.current.getCanvas().style.cursor = '';
+            });
 
-  useEffect(() => {
-    const human = globeState.detailedHuman;
-    if (!human) return;
+            globeState.globeRef.current.on('mouseenter', 'singletons', () => {
+                globeState.globeRef.current.getCanvas().style.cursor = 'pointer';
+            });
 
-    const stillExists = notableHumans.some(h => h.id === human.id);
+            globeState.globeRef.current.on('mouseleave', 'singletons', () => {
+                globeState.globeRef.current.getCanvas().style.cursor = '';
+            });
 
-    if (!stillExists) {
-      globeState.setDetailedHuman(null);
+            return () => {
+                globeState.globeRef.current.remove();
+                globeState.globeRef.current = null;
+            };
+        });
+    }, [globeState.geojsonData, globeState]);
 
-      // Also clean up halo manually if needed (already happens inside useEffect cleanup, but extra safe)
-      const globe = globeState.globeRef.current;
-      if (globe) {
-        const haloSource = globe.getSource('halo');
-        if (haloSource) {
-          haloSource.setData({ type: 'FeatureCollection', features: [] });
-        }
-      }
-    }
-  }, [notableHumans]);
+    // When the `humans` array changes, rebuild the GeoJSON FeatureCollection
+    // and update the “humans” source on the Mapbox map so only the filtered points are rendered.
+    useEffect(() => {
+        if (!globeState.globeRef.current) return;
+        const source = globeState.globeRef.current.getSource('humans');
+        if (!source) return;
 
+        // Build the filtered GeoJSON directly here:
+        const filteredGeoJSON = {
+            type: 'FeatureCollection',
+            features: humans.map(person => ({
+                type: 'Feature',
+                geometry: {
+                    type: 'Point',
+                    coordinates: [person.lng, person.lat],
+                },
+                properties: {
+                    ...person,
+                },
+            })),
+        };
+        source.setData(filteredGeoJSON);
+    }, [humans, globeState]);
 
-  // When a human is selected in sidebar: fly, halo, and keep synced on zoom/pan
-  useEffect(() => {
-    const map = globeState.globeRef.current;
-    const human = globeState.detailedHuman;
-    if (!map) return;
+    // Update the cluster popup lists on map moveend (zoom or pan)
+    useEffect(() => {
+        // nothing to do if there’s no popup up or no cluster context
+        if (!globeState.globeRef.current) return;
 
-    // helper to clear existing halo
-    const clearHalo = () => {
-      const src = map.getSource('halo');
-      if (src) src.setData({ type: 'FeatureCollection', features: [] });
-      if (globeState.haloAnimationFrameRef.current) {
-        cancelAnimationFrame(globeState.haloAnimationFrameRef.current);
-        globeState.isHaloActiveRef.current = false;
-      }
-    };
+        const onMoveEnd = () => {
+            // detect zoom change
+            const newZoom = globeState.globeRef.current.getZoom();
+            const zoomChanged = newZoom !== lastZoomRef.current;
+            lastZoomRef.current = newZoom;
 
-    // if panel closed, clear and exit
-    if (!human) {
-      clearHalo();
-      return;
-    }
+            if (!clusterContextRef.current) return; // never opened a popup yet
 
-    // fly to human at current zoom
-    const zoom = map.getZoom();
-    const lng = parseFloat(human.lng);
-    const lat = parseFloat(human.lat);
-    map.flyTo({ center: [lng, lat], zoom, essential: true });
+            // project the tracked coords and look for any feature there
+            const point    = globeState.globeRef.current.project(clusterContextRef.current.lngLat);
+            const features = globeState.globeRef.current.queryRenderedFeatures(point, {
+                layers: ['clusters','singletons']
+            });
 
-    // after initial move, draw halo around correct cluster/point
-    const afterMove = () => {
-      void updateHaloForDetailedHuman(map, human, globeState);
-      map.off('moveend', afterMove);
-    };
-    map.once('moveend', afterMove);
+            // If nothing renders at point, “off‐screen” happened by panning OR zooming
+            if (features.length === 0) {
+                // pan → removeOnly=true; zoom → removeOnly=false
+                closePopup(popupRef, popupListDivRef, clusterContextRef, !zoomChanged);
+                return;
+            }
 
-    // on subsequent zoom/pan, re-draw halo (no re-centering)
-    const updateOnMoveEnd = () => {
-      void updateHaloForDetailedHuman(map, human, globeState);
-    };
-    map.on('moveend', updateOnMoveEnd);
+            //find *our* feature in features
+            let feature;
+            if (clusterContextRef.current.clusterId != null) {
+                feature = features.find(f => f.properties.cluster_id === clusterContextRef.current.clusterId);
+            } else {
+                // singleton case: match by your saved singletonFeature.id
+                feature = features.find(f => f.properties.id === clusterContextRef.current.singletonFeature.properties.id);
+            }
 
-    // cleanup listener and clear halo on change/close
-    return () => {
-      map.off('moveend', updateOnMoveEnd);
-      clearHalo();
-    };
-  }, [globeState.detailedHuman]);
+            // if feature is undefined, that means your original cluster truly disappeared → full close
+            if (!feature) {
+                closePopup(popupRef, popupListDivRef, clusterContextRef);
+                return
+            }
 
-  useEffect(() => {
-    const { clusterId, lngLat, totalCount } = clusterWithPopupRef.current;
-    if (!clusterId || !popupRef.current) return;
+            const fakeEvent = {
+                features: [feature],
+                lngLat: { lng: feature.geometry.coordinates[0], lat: feature.geometry.coordinates[1] }
+            };
 
-    buildClusterPopup(
-      globeState.globeRef.current,
-      globeState,
-      popupRef,
-      clusterId,
-      lngLat,
-      totalCount
-    );
-  }, [globeState.sortBy, globeState.sortAsc]);
+            // If it’s back on‐screen but we’ve hidden the popup, rebuild from scratch
+            if (!popupRef.current) {
+                buildClusterPopup(
+                    fakeEvent,
+                    clusterContextRef,
+                    popupRef,
+                    popupListDivRef,
+                    globeState,
+                    filterState,
+                    filteredHumansIdSet
+                );
+                return;
+            }
 
-  return (
-    <Box position="relative" width="100%" height="100%">
-      <Box
-        sx={{
-          position: 'absolute',
-          top: 10,
-          left: globeState.sidebarOpen ? `${SIDEBAR_WIDTH}px` : 0,
-          right: 0,
-          transition: 'left 300ms ease-in-out',
-          display: 'flex',
-          justifyContent: 'center',
-          pointerEvents: 'none',
-          zIndex: 10,
-        }}
-      >
-        <Box
-          sx={{
-            backgroundColor: 'rgba(255,255,255,0.85)',
-            borderTop: `1px solid ${theme.palette.divider}`,
-            padding: 1,
-            borderRadius: 1,
-            boxShadow: 1,
-            fontSize: '13px',
-            fontFamily: 'Roboto, sans-serif',
-            pointerEvents: 'none',
-            maxWidth: '85%',
-            whiteSpace: 'normal',
-            textAlign: 'center',
-          }}
-        >
-           {/* First clause on its own line */}
-            <Typography variant="h6" component="div" sx={{lineHeight: 1}}>
-              {filterClauses[0]}
-            </Typography>
-
-            {/* Remaining clauses joined with “and”, only if any */}
-            {filterClauses.length > 1 && (
-              <Typography variant="body2" component="div" sx={{ mt: 0.5, fontSize: '1.1em' }}>
-                {filterClauses.slice(1).map((clause, idx) => {
-                  // split into “[prefix]includes” and the values string
-                  const [prefix, valuesStr] = clause.split(/includes\s+/);
-                  // if it’s not an “includes” clause, render it as-is
-                  if (valuesStr == null) {
-                    return (
-                      <React.Fragment key={idx}>
-                        {clause}
-                        {idx < filterClauses.length - 2 && ' and '}
-                      </React.Fragment>
-                    );
-                  }
-
-                  // now split valuesStr on " and " or " or ", keeping the separators
-                  const parts = valuesStr.split(/(\s(?:and|or)\s)/);
-
-                  return (
-                    <React.Fragment key={idx}>
-                      {prefix}includes{' '}
-                      {parts.map((part, i) => {
-                        // if this part *is* “ and ” or “ or ”, render plain
-                        if (/^( and | or )$/.test(part)) {
-                          return <span key={i}>{part}</span>;
+            if (zoomChanged){
+                // 🔄 Otherwise it’s on‐screen and still open → update its contents
+                if (feature.properties.cluster_id != null) {
+                    // Cluster: re‐fetch leaves & filter
+                    globeState.globeRef.current.getSource('humans').getClusterLeaves(
+                        feature.properties.cluster_id,
+                        feature.properties.point_count,
+                        0,
+                        (err, leaves) => {
+                            if (err) {
+                                // zoomed past it → fully close
+                                closePopup(popupRef, popupListDivRef, clusterContextRef);
+                                return;
+                            }
+                            const kept = leaves.filter(l => matchesFilter(l.properties, filteredHumansIdSet));
+                            if (!kept.length) {
+                                // filter emptied it → fully close
+                                closePopup(popupRef, popupListDivRef, clusterContextRef);
+                                return;
+                            }
+                            // update context
+                            clusterContextRef.current = {
+                                clusterId: feature.properties.cluster_id,
+                                lngLat: feature.geometry.coordinates,
+                                totalCount: kept.length,
+                                singletonFeature: null
+                            };
+                            // rebuild the popup with the new leaf set
+                            buildClusterPopup(
+                                fakeEvent,
+                                clusterContextRef,
+                                popupRef,
+                                popupListDivRef,
+                                globeState,
+                                filterState,
+                                filteredHumansIdSet
+                            );
                         }
-                        // otherwise it’s a value—italicize
-                        return <em key={i}>{part}</em>;
-                      })}
-                      {idx < filterClauses.length - 2 && ' and '}
-                    </React.Fragment>
-                  );
-                })}
-              </Typography>
-            )}
+                    );
+                } else {
+                    // Singleton point: test filter, update or close
+                    if (!matchesFilter(feature.properties, filteredHumansIdSet)) {
+                        closePopup(popupRef, popupListDivRef, clusterContextRef);
+                        return;
+                    }
+                    clusterContextRef.current = {
+                        clusterId: null,
+                        lngLat: feature.geometry.coordinates,
+                        totalCount: 1,
+                        singletonFeature: feature
+                    };
+                    buildClusterPopup(
+                        fakeEvent,
+                        clusterContextRef,
+                        popupRef,
+                        popupListDivRef,
+                        globeState,
+                        filterState,
+                        filteredHumansIdSet
+                    );
+                }
+            } else {
+                // ————— Just a pan: reposition the existing popup —————
+                popupRef.current.setLngLat(clusterContextRef.current.lngLat);
+            }
+        };
+        globeState.globeRef.current.on('moveend', onMoveEnd);
+        return () => {
+            globeState.globeRef.current.off('moveend', onMoveEnd);
+        };
+
+    }, [globeState]);
+
+    // Rebuild the cluster popup when sort or filter inputs change
+    useEffect(() => {
+        if (popupRef.current) {
+            rebuildClusterPopup();
+        }
+    }, [rebuildClusterPopup]);
+
+    // Remove padding when sidebar closes
+    useEffect(() => {
+        if (!globeState.globeRef.current) return;
+
+        if (!globeState.sidebarOpen) {
+            globeState.globeRef.current.easeTo({
+                center: globeState.globeRef.current.getCenter(),
+                padding: {left: 0, right: 0, top: 0, bottom: 0},
+                duration: 500,
+            });
+        }
+    }, [globeState, globeState.sidebarOpen]);
+
+    // Add padding when sidebar closes
+    useEffect(() => {
+        if (!globeState.globeRef.current || !globeState.sidebarOpen) return;
+        globeState.globeRef.current.easeTo({
+            center: globeState.globeRef.current.getCenter(),
+            padding: {left: SIDEBAR_WIDTH, right: 0, top: 0, bottom: 0},
+            duration: 300,
+            easing: t => t,
+            essential: true,
+        });
+    }, [globeState, globeState.sidebarOpen]);
+
+    return (
+        <Box position="relative" width="100%" height="100%">
+
+            <FilterSummary
+                filterState={filterState}
+                humansCount={humans.length}
+                sidebarOpen={globeState.sidebarOpen}
+                sidebarWidth={SIDEBAR_WIDTH}
+            />
+
+            <Box
+                ref={containerRef}
+                position="absolute"
+                top={0}
+                left={0}
+                right={0}
+                bottom={0}
+            />
         </Box>
-      </Box>
-
-      <Box
-        ref={containerRef}
-        position="absolute"
-        top={0}
-        left={0}
-        right={0}
-        bottom={0}
-      />
-    </Box>
-
-  );
-
-};
-
+    );
+}
 export default Globe;

@@ -1,3 +1,4 @@
+// src/utils/sortHumans.js
 export const sortHumansComparator = (sortBy, sortAsc) => (a, b) => {
     // multiplier so we can just flip the sign
   const m = sortAsc ? 1 : -1

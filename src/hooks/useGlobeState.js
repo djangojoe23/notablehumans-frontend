@@ -1,38 +1,36 @@
-// hooks/useGlobeState.js
-import { useState, useRef } from 'react';
+import { useState, useRef, useMemo } from 'react';
 import useSyncedStateWithRef from './useSyncedStateWithRef';
 
-const useGlobeState = () => {
-  const globeRef = useRef(null);
+export const useGlobeState = () => {
+    // 1) Create refs and individual state
 
-  const [notableHumanData, setNotableHumanData] = useState(null);
-  const [dataLoadError, setDataLoadError] = useState(null);
+    /** @type {React.MutableRefObject<mapboxgl.Map | null>} */
+    const globeRef = useRef(null);
 
-  const [sidebarOpen, setSidebarOpen, sidebarOpenRef] = useSyncedStateWithRef(false);
+    // this is the data on notable humans that is loaded on initial page load
+    // it only includes names, birth/death dates, and birth/death coordinates
+    const [geojsonData, setGeojsonData] = useState(null);
+    const [geojsonLoadError, setGeojsonLoadError] = useState(null);
+    const [sidebarOpen, setSidebarOpen, sidebarOpenRef] = useSyncedStateWithRef(false);
 
-  const [detailedHuman, setDetailedHuman] = useState(null);
+    // 2) Memoize the returned object so `globeState` only changes if one of these
+    //    values changes. Note: setter functions and refs are stable, so we only
+    //    list the actual state values as dependencies.
+    return useMemo(() => ({
+        globeRef,
 
-  const isHaloActiveRef = useRef(false);
-  const haloAnimationFrameRef = useRef(null);
-  const haloPersistRef = useRef(null);
-  const currentHaloFeatureRef = useRef(null);
+        geojsonData,        setGeojsonData,
+        geojsonLoadError,   setGeojsonLoadError,
 
-  const justClickedUnclusteredRef = useRef(null);
+        sidebarOpen,        setSidebarOpen,        sidebarOpenRef,
+    }),
+        [
+            geojsonData,
+            geojsonLoadError,
+            sidebarOpen,
+        ]
+    );
 
-  return {
-    globeRef,
-
-    notableHumanData, setNotableHumanData,
-    dataLoadError, setDataLoadError,
-
-    sidebarOpen, setSidebarOpen, sidebarOpenRef,
-
-    detailedHuman, setDetailedHuman,
-
-    isHaloActiveRef, haloAnimationFrameRef, haloPersistRef, currentHaloFeatureRef,
-
-    justClickedUnclusteredRef,
-  };
 };
 
 export default useGlobeState;

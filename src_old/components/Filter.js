@@ -14,6 +14,9 @@ import {
   Typography,
   Button,
   IconButton,
+  RadioGroup,
+  FormControlLabel,
+  Radio
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { ArrowUpward, ArrowDownward } from '@mui/icons-material';
@@ -53,7 +56,6 @@ const Filter = ({
   const [attributeOptions, setAttributeOptions] = useState({});
 
   const [withinSign, setWithinSign] = useState('plus');  // 'plus' or 'minus'
-
 
   // load attribute options
   useEffect(() => {
@@ -107,52 +109,87 @@ const Filter = ({
           <>
             {/* Search */}
             <Box>
-              <Box
-                component="fieldset"
-                sx={{
-                  flex: 1,
-                  border: 1,
-                  borderColor: 'divider',
-                  borderRadius: 1,
-                  p: 1,
-                    px: 0.5,
-                  '& legend': {}
-                }}
-              >
-                <Box component="legend">
-                  <ToggleButtonGroup
-                    value={nameMatchType}
-                    exclusive
+              <Box component="fieldset"
+                   sx={{
+                    border: 1,
+                    borderColor: 'divider',
+                    borderRadius: 1,
+                    p: 1, pt:0,
+                    '& legend': {
+                      font: theme.typography.subtitle2,
+                      fontSize: '0.875rem',
+                    }
+                  }}>
+
+                  <Box component="legend">Search by Name</Box>
+
+    <FormControl component="div" sx={{p: 0}}>
+      <RadioGroup
+        row
+        name="nameMatchType"
+        value={nameMatchType}
+        onChange={(e) => setNameMatchType(e.target.value)}
+      >
+        <FormControlLabel
+          value="startswith"
+          control={<Radio size="small" />}
+          label="Starts with"
+          sx={{
+            '& .MuiFormControlLabel-label': {
+              fontSize: '0.8rem',       // ← shrink label text
+              // ...theme.typography.subtitle,
+              textTransform: 'none',
+            },
+          }}
+        />
+        <FormControlLabel
+          value="contains"
+          control={<Radio size="small" />}
+          label="Contains"
+          sx={{
+            '& .MuiFormControlLabel-label': {
+            fontSize: '0.8rem',       // ← shrink label text
+            // ...theme.typography.subtitle,
+            textTransform: 'none',
+            },
+          }}
+        />
+      </RadioGroup>
+    </FormControl>
+
+                  <TextField
                     size="small"
-                    onChange={(_, v) => v && setNameMatchType(v)}
-                    sx={{
-                      '& .MuiToggleButton-root': {
-                        ...theme.typography.subtitle2,
-                        textTransform: 'none'
-                      },
-                      '& .Mui-selected': {
-                        fontWeight: theme.typography.subtitle2.fontWeight + 100
-                      }
-                    }}
-                  >
-                    <ToggleButton value="startswith">Starts with</ToggleButton>
-                    <ToggleButton value="contains">Contains</ToggleButton>
-                  </ToggleButtonGroup>
-                </Box>
-                <TextField
-                  label="Search by name"
-                  size="small"
-                  value={searchQuery}
-                  onChange={e => setSearchQuery(e.target.value)}
-                  fullWidth
-                />
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    fullWidth
+                  />
+
               </Box>
             </Box>
+
+                              {/*<ToggleButtonGroup*/}
+                  {/*  value={nameMatchType}*/}
+                  {/*  exclusive*/}
+                  {/*  size="small"*/}
+                  {/*  onChange={(_, v) => v && setNameMatchType(v)}*/}
+                  {/*  sx={{*/}
+                  {/*    '& .MuiToggleButton-root': {*/}
+                  {/*      ...theme.typography.subtitle2,*/}
+                  {/*      textTransform: 'none'*/}
+                  {/*    },*/}
+                  {/*    '& .Mui-selected': {*/}
+                  {/*      fontWeight: theme.typography.subtitle2.fontWeight + 100*/}
+                  {/*    }*/}
+                  {/*  }}*/}
+                  {/*>*/}
+                  {/*  <ToggleButton value="startswith">Starts with</ToggleButton>*/}
+                  {/*  <ToggleButton value="contains">Contains</ToggleButton>*/}
+                  {/*</ToggleButtonGroup>*/}
 
             {/* Sort */}
             <Box component="fieldset" sx={{
               border: 1, borderColor: 'divider', borderRadius: 1, p: 1,
-              '& legend': { fontSize: '0.875rem', fontWeight: 500 }
+              '& legend': { font: theme.typography.subtitle2, fontSize: '0.875rem' }
             }}>
               <Box component="legend">Sort List By</Box>
               <Stack direction="row" spacing={1} alignItems="center">
